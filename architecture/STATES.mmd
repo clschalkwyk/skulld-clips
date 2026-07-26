@@ -1,0 +1,16 @@
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Validating: export requested
+  Validating --> Preparing: valid
+  Validating --> Failed: invalid
+  Preparing --> Running: process spawned
+  Preparing --> Failed: asset/process setup error
+  Running --> Verifying: exit 0
+  Running --> Cancelling: cancel
+  Running --> Failed: non-zero
+  Cancelling --> Cancelled: killed and cleaned
+  Verifying --> Completed: verified and renamed
+  Verifying --> Failed: invalid output
+  Completed --> Idle
+  Cancelled --> Idle
+  Failed --> Idle

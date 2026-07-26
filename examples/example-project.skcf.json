@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "id": "7ec5d9d5-b322-4f4d-9bfe-d5b6cce44c95",
+  "name": "Diablo clip 001",
+  "createdAt": "2026-07-26T14:00:00Z",
+  "updatedAt": "2026-07-26T14:10:00Z",
+  "source": {
+    "path": "C:\\Users\\creator\\Videos\\gameplay.mp4",
+    "filename": "gameplay.mp4",
+    "fingerprint": {
+      "sizeBytes": 2147483648,
+      "modifiedAtMs": 1785070800000,
+      "firstChunkSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "lastChunkSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "probe": {
+      "durationMs": 120000,
+      "containerName": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fileSizeBytes": 2147483648,
+      "video": {
+        "streamIndex": 0,
+        "codec": "h264",
+        "rawWidth": 1920,
+        "rawHeight": 1080,
+        "displayWidth": 1920,
+        "displayHeight": 1080,
+        "rotationDegrees": 0,
+        "avgFrameRate": 60.0,
+        "realFrameRate": 60.0,
+        "pixelFormat": "yuv420p",
+        "sampleAspectRatio": "1:1"
+      },
+      "hasAudio": true,
+      "audio": {
+        "streamIndex": 1,
+        "codec": "aac",
+        "sampleRate": 48000,
+        "channels": 2,
+        "channelLayout": "stereo"
+      },
+      "warnings": []
+    }
+  },
+  "timeline": {
+    "inMs": 8400,
+    "outMs": 23600
+  },
+  "canvas": {
+    "width": 1080,
+    "height": 1920,
+    "background": "crop-fill"
+  },
+  "crop": {
+    "x": 0.359375,
+    "y": 0.0,
+    "width": 0.28125,
+    "height": 1.0
+  },
+  "overlays": [
+    {
+      "type": "caption",
+      "id": "508ba442-6761-4656-a1ab-6606e5f91712",
+      "name": "Hook",
+      "position": {
+        "x": 0.08,
+        "y": 0.06,
+        "width": 0.84,
+        "height": 0.16
+      },
+      "opacity": 1.0,
+      "startMs": 8400,
+      "endMs": 23600,
+      "zIndex": 10,
+      "caption": {
+        "text": "WELL, THAT WENT TO SHIT",
+        "fontFamily": "BundledSans",
+        "fontSizePx": 72,
+        "fontWeight": 800,
+        "align": "center",
+        "lineHeight": 1.05,
+        "maxWidthPx": 900,
+        "fill": "#FFFFFF",
+        "outlineWidthPx": 8,
+        "outlineColor": "#000000",
+        "backgroundEnabled": false,
+        "backgroundColor": "#000000CC",
+        "paddingPx": 24
+      },
+      "generatedAsset": {
+        "relativePath": "assets/captions/example-caption.png",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "width": 908,
+        "height": 220,
+        "mimeType": "image/png",
+        "originalFilename": null
+      }
+    },
+    {
+      "type": "image",
+      "id": "04b79daa-9a6d-40a0-851d-e48a47be6512",
+      "name": "Skull’d logo",
+      "position": {
+        "x": 0.78,
+        "y": 0.86,
+        "width": 0.16,
+        "height": 0.09
+      },
+      "opacity": 0.9,
+      "startMs": 8400,
+      "endMs": 23600,
+      "zIndex": 20,
+      "asset": {
+        "relativePath": "assets/overlays/skulld-logo.png",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "width": 512,
+        "height": 288,
+        "mimeType": "image/png",
+        "originalFilename": "skulld-logo.png"
+      }
+    }
+  ],
+  "exportDefaults": {
+    "presetId": "youtube-shorts",
+    "qualityMode": "balanced",
+    "frameRateMode": "source-capped-60",
+    "videoCodec": "h264",
+    "pixelFormat": "yuv420p",
+    "audioCodec": "aac",
+    "audioBitrateKbps": 192
+  }
+}

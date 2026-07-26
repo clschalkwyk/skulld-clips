@@ -1,0 +1,38 @@
+sequenceDiagram
+  autonumber
+  actor User
+  participant UI as Svelte UI
+  participant Cmd as Tauri command
+  participant Svc as Export service
+  participant FF as FFmpeg
+  participant Probe as ffprobe
+  participant FS as Filesystem
+
+  User->>UI: Export
+  UI->>Cmd: validate_export
+  Cmd->>Svc: Validate snapshot/path/assets/disk
+  Svc-->>UI: validation
+  UI->>Cmd: start_export
+  Cmd->>Svc: Create job
+  Svc->>FS: Create partial output
+  Svc->>FF: Spawn argument vector
+  Cmd-->>UI: jobId
+  loop Encoding
+    FF-->>Svc: progress key/value
+    Svc-->>UI: export://progress
+  end
+  alt Cancel
+    UI->>Cmd: cancel_export(jobId)
+    Cmd->>Svc: terminate process tree
+    Svc->>FS: remove partial
+    Svc-->>UI: export://cancelled
+  else Failure
+    FF-->>Svc: non-zero
+    Svc->>FS: remove partial
+    Svc-->>UI: export://failed
+  else Success
+    Svc->>Probe: verify partial
+    Probe-->>Svc: metadata
+    Svc->>FS: atomic rename
+    Svc-->>UI: export://completed
+  end

@@ -1,0 +1,36 @@
+ID,Milestone,Task,Hours,Depends on,Acceptance
+SCF-001,M0,Scaffold Tauri/Svelte TypeScript,1.0,,App launches
+SCF-002,M0,Quality scripts and CI skeleton,0.5,SCF-001,Checks run
+SCF-003,M0,AppError and typed invoke adapter,0.75,SCF-001,Errors round-trip
+SCF-004,M0,Minimal capabilities,0.75,SCF-001,No frontend shell
+SCF-005,M0,Sidecar path/runtime info,1.0,SCF-003,Versions returned
+SCF-010,M1,ffprobe wrapper timeout/bounds,1.0,SCF-005,Safe process
+SCF-011,M1,Normalize probe output,1.25,SCF-010,Fixtures parse
+SCF-012,M1,Project validation/schema,0.75,SCF-003,Invalid rejected
+SCF-013,M1,Project create/atomic save,1.0,"SCF-011,SCF-012",Project durable
+SCF-014,M1,Weak source fingerprint,0.5,SCF-013,Change detected
+SCF-015,M1,Autosave/recent projects,0.75,SCF-013,Restart restores
+SCF-020,M2,Video preview lifecycle,1.0,SCF-015,Local playback
+SCF-021,M2,Timeline/trim/shortcuts,1.25,SCF-020,I/O works
+SCF-022,M2,Coordinate mapper,1.25,SCF-011,Orientation tests
+SCF-023,M2,9:16 crop solver,1.25,SCF-022,Valid constraints
+SCF-024,M2,Interactive crop,1.5,SCF-023,Drag/resize/nudge
+SCF-025,M2,Persist edit state,0.75,"SCF-021,SCF-024",Reopen exact
+SCF-030,M3,Overlay asset import,1.0,SCF-013,Copied/hashed
+SCF-031,M3,Overlay transform/z-order,1.5,"SCF-030,SCF-022",Stage=inspector
+SCF-032,M3,Overlay timing,0.75,"SCF-021,SCF-031",Visibility correct
+SCF-033,M3,Caption editor/renderer,1.25,SCF-031,Preview PNG
+SCF-034,M3,Caption hash/write,0.5,SCF-033,Asset reused
+SCF-040,M4,Export validation,1.0,"SCF-025,SCF-034",Pre-spawn errors
+SCF-041,M4,Filter graph builder,1.5,"SCF-022,SCF-040",Pure/tested
+SCF-042,M4,FFmpeg args builder,1.0,SCF-041,No shell
+SCF-043,M4,Process registry/spawn,1.0,SCF-042,One active
+SCF-044,M4,Progress parser/events,1.0,SCF-043,Structured progress
+SCF-045,M4,Cancellation/process tree,1.0,SCF-043,Partial removed
+SCF-046,M4,ffprobe verify/rename,0.5,SCF-043,Verified final
+SCF-050,M5,Media fixture suite,1.25,SCF-046,Matrix passes
+SCF-051,M5,Golden frame tests,1.0,SCF-050,Preview parity
+SCF-052,M5,Logs/redaction,0.75,SCF-003,No leakage
+SCF-053,M5,Diagnostic ZIP,0.75,SCF-052,Exclusions pass
+SCF-054,M5,Startup cleanup,0.5,SCF-013,Stale safe
+SCF-055,M5,Windows package smoke,0.75,SCF-050,Installed export

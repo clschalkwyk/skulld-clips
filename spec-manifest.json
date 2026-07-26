@@ -1,0 +1,19 @@
+{
+  "name": "Skull’d Clip Forge Software Specification",
+  "version": "1.0",
+  "preparedDate": "2026-07-26",
+  "stack": [
+    "Tauri 2",
+    "Rust",
+    "Svelte 5",
+    "TypeScript",
+    "FFmpeg",
+    "ffprobe"
+  ],
+  "primaryTarget": "Windows 11 x64",
+  "secondaryTargets": [
+    "macOS arm64",
+    "macOS x86_64"
+  ],
+  "projectSchemaVersion": 1
+}

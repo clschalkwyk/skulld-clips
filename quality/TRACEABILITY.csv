@@ -1,0 +1,18 @@
+Requirement,Description,Primary verification
+FR-001,Import local media,Happy path and unsupported media tests
+FR-002,Probe/normalize metadata,Fixture probe integration
+FR-003,Durable project,Reopen acceptance
+FR-004,Trim,Time validation unit tests
+FR-005,9:16 crop,Crop solver and golden frames
+FR-006,Image overlay,Happy path/golden frame
+FR-007,Raster caption,Caption unit/golden frame
+FR-008,Preview parity,Golden frames
+FR-009,Verified MP4 export,Happy/silent source acceptance
+FR-010,Progress/cancel,Cancellation acceptance
+FR-011,Reopen/relink,Relink/changed source acceptance
+FR-012,Recent projects,Store/component integration
+FR-013,Diagnostics,Bundle exclusion integration
+SEC-001,No frontend shell,Capability audit
+SEC-002,Path containment,Traversal unit tests
+REL-001,Partial then final,Failed verification integration
+PRIV-001,No network/upload,Offline acceptance/capability audit

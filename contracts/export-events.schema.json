@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Skull’d Export Event",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event",
+        "jobId",
+        "phase",
+        "progress",
+        "encodedMs",
+        "totalMs"
+      ],
+      "properties": {
+        "event": {
+          "const": "export://progress"
+        },
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "phase": {
+          "enum": [
+            "preparing-assets",
+            "encoding",
+            "verifying"
+          ]
+        },
+        "progress": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.99
+        },
+        "encodedMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fps": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "speed": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "outputBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event",
+        "jobId",
+        "outputPath",
+        "durationMs",
+        "sizeBytes"
+      ],
+      "properties": {
+        "event": {
+          "const": "export://completed"
+        },
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "outputPath": {
+          "type": "string"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event",
+        "jobId",
+        "error"
+      ],
+      "properties": {
+        "event": {
+          "const": "export://failed"
+        },
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "error": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event",
+        "jobId"
+      ],
+      "properties": {
+        "event": {
+          "const": "export://cancelled"
+        },
+        "jobId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  ]
+}

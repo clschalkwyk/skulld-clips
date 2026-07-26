@@ -1,0 +1,623 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.skulld.invalid/project-v1.schema.json",
+  "title": "Skull’d Clip Forge Project v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "createdAt",
+    "updatedAt",
+    "source",
+    "timeline",
+    "canvas",
+    "crop",
+    "overlays",
+    "exportDefaults"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "timeline": {
+      "$ref": "#/$defs/timeline"
+    },
+    "canvas": {
+      "$ref": "#/$defs/canvas"
+    },
+    "crop": {
+      "$ref": "#/$defs/rect"
+    },
+    "overlays": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/overlay"
+      }
+    },
+    "exportDefaults": {
+      "$ref": "#/$defs/exportSettings"
+    }
+  },
+  "$defs": {
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sizeBytes",
+        "modifiedAtMs",
+        "firstChunkSha256"
+      ],
+      "properties": {
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "modifiedAtMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "firstChunkSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "lastChunkSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "videoProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "streamIndex",
+        "codec",
+        "rawWidth",
+        "rawHeight",
+        "displayWidth",
+        "displayHeight",
+        "rotationDegrees"
+      ],
+      "properties": {
+        "streamIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "codec": {
+          "type": "string"
+        },
+        "rawWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rawHeight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "displayWidth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "displayHeight": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rotationDegrees": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ]
+        },
+        "avgFrameRate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "realFrameRate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "pixelFormat": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sampleAspectRatio": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "audioProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "streamIndex",
+        "codec"
+      ],
+      "properties": {
+        "streamIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "codec": {
+          "type": "string"
+        },
+        "sampleRate": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "channels": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "channelLayout": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "durationMs",
+        "containerName",
+        "fileSizeBytes",
+        "video",
+        "hasAudio",
+        "warnings"
+      ],
+      "properties": {
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "containerName": {
+          "type": "string"
+        },
+        "fileSizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "video": {
+          "$ref": "#/$defs/videoProbe"
+        },
+        "hasAudio": {
+          "type": "boolean"
+        },
+        "audio": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/audioProbe"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "filename",
+        "fingerprint",
+        "probe"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/fingerprint"
+        },
+        "probe": {
+          "$ref": "#/$defs/probe"
+        }
+      }
+    },
+    "timeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inMs",
+        "outMs"
+      ],
+      "properties": {
+        "inMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height",
+        "background"
+      ],
+      "properties": {
+        "width": {
+          "const": 1080
+        },
+        "height": {
+          "const": 1920
+        },
+        "background": {
+          "const": "crop-fill"
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath",
+        "sha256",
+        "width",
+        "height",
+        "mimeType"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "originalFilename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "captionStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "fontFamily",
+        "fontSizePx",
+        "fontWeight",
+        "align",
+        "lineHeight",
+        "maxWidthPx",
+        "fill",
+        "outlineWidthPx",
+        "outlineColor",
+        "backgroundEnabled",
+        "backgroundColor",
+        "paddingPx"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "fontFamily": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fontSizePx": {
+          "type": "number",
+          "minimum": 12,
+          "maximum": 300
+        },
+        "fontWeight": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 900
+        },
+        "align": {
+          "enum": [
+            "left",
+            "center",
+            "right"
+          ]
+        },
+        "lineHeight": {
+          "type": "number",
+          "minimum": 0.8,
+          "maximum": 3
+        },
+        "maxWidthPx": {
+          "type": "number",
+          "minimum": 50,
+          "maximum": 1080
+        },
+        "fill": {
+          "type": "string"
+        },
+        "outlineWidthPx": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "outlineColor": {
+          "type": "string"
+        },
+        "backgroundEnabled": {
+          "type": "boolean"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "paddingPx": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "overlayBase": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "position",
+        "opacity",
+        "startMs",
+        "endMs",
+        "zIndex"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "position": {
+          "$ref": "#/$defs/rect"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "startMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "zIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999
+        }
+      }
+    },
+    "imageOverlay": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/overlayBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "asset"
+          ],
+          "properties": {
+            "type": {
+              "const": "image"
+            },
+            "asset": {
+              "$ref": "#/$defs/asset"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "captionOverlay": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/overlayBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "caption",
+            "generatedAsset"
+          ],
+          "properties": {
+            "type": {
+              "const": "caption"
+            },
+            "caption": {
+              "$ref": "#/$defs/captionStyle"
+            },
+            "generatedAsset": {
+              "$ref": "#/$defs/asset"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "overlay": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/imageOverlay"
+        },
+        {
+          "$ref": "#/$defs/captionOverlay"
+        }
+      ]
+    },
+    "exportSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "presetId",
+        "qualityMode",
+        "frameRateMode",
+        "videoCodec",
+        "pixelFormat",
+        "audioCodec",
+        "audioBitrateKbps"
+      ],
+      "properties": {
+        "presetId": {
+          "enum": [
+            "vertical-generic",
+            "youtube-shorts",
+            "instagram-reels",
+            "tiktok"
+          ]
+        },
+        "qualityMode": {
+          "enum": [
+            "draft",
+            "balanced",
+            "high"
+          ]
+        },
+        "frameRateMode": {
+          "enum": [
+            "source-capped-60",
+            "30",
+            "60"
+          ]
+        },
+        "videoCodec": {
+          "const": "h264"
+        },
+        "pixelFormat": {
+          "const": "yuv420p"
+        },
+        "audioCodec": {
+          "const": "aac"
+        },
+        "audioBitrateKbps": {
+          "enum": [
+            128,
+            160,
+            192,
+            256
+          ]
+        }
+      }
+    }
+  }
+}

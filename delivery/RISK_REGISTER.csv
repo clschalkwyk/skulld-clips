@@ -1,0 +1,10 @@
+ID,Risk,Probability,Impact,Mitigation
+R-001,Preview/export coordinate mismatch,Medium,High,One mapper; golden frames
+R-002,FFmpeg distribution obligations missed,Medium,High,Pinned build records/notices/legal review
+R-003,Rotation metadata breaks crop,Medium,High,Normalize orientation; fixtures
+R-004,VFR causes drift,Medium,Medium,Time trim; CFR output; sync tests
+R-005,Windows cancellation leaves child,Medium,High,Process-tree kill tests
+R-006,Signing blocks distribution,High,Medium,Separate release milestone
+R-007,Font mismatch,Medium,Medium,Bundle/rasterize/golden tests
+R-008,Scope becomes full editor,High,High,Block non-goals until acceptance
+R-009,Hardware encoding inconsistency,Medium,Medium,CPU default; defer

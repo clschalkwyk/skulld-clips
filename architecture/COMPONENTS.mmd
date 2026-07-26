@@ -1,0 +1,48 @@
+flowchart TB
+  subgraph Webview["Tauri Webview"]
+    Home["Home"]
+    Editor["Editor"]
+    ExportUI["Export sheet"]
+    ProjectState["Project state"]
+    Playback["Playback state"]
+    ExportState["Export state"]
+    Bridge["Typed bridge"]
+    Home --> ProjectState
+    Editor --> ProjectState
+    Editor --> Playback
+    ExportUI --> ExportState
+    ProjectState --> Bridge
+    ExportState --> Bridge
+  end
+
+  subgraph Core["Rust core"]
+    Commands["Commands"]
+    ProjectSvc["Project service"]
+    ProbeSvc["Probe service"]
+    ExportSvc["Export service"]
+    Registry["Process registry"]
+    Policy["Path policy"]
+    Filter["Filter/args builder"]
+    Commands --> ProjectSvc
+    Commands --> ProbeSvc
+    Commands --> ExportSvc
+    ProjectSvc --> Policy
+    ProbeSvc --> Policy
+    ExportSvc --> Policy
+    ExportSvc --> Registry
+    ExportSvc --> Filter
+  end
+
+  subgraph Native["Native resources"]
+    Projects[("JSON/assets")]
+    Probe["ffprobe"]
+    FF["FFmpeg"]
+    Output[("MP4")]
+  end
+
+  Bridge --> Commands
+  ProjectSvc --> Projects
+  ProbeSvc --> Probe
+  ExportSvc --> FF
+  FF --> Output
+  ExportSvc -. events .-> Bridge
