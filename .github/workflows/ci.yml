@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-milestone-zero:
+    name: Windows checks and launch smoke
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Type-check frontend
+        run: npm run check
+
+      - name: Test frontend
+        run: npm test
+
+      - name: Check Rust formatting
+        run: npm run rust:fmt
+
+      - name: Lint Rust
+        run: npm run rust:clippy
+
+      - name: Test Rust
+        run: npm run rust:test
+
+      - name: Build debug desktop application
+        run: npm run tauri build -- --debug --no-bundle
+
+      - name: Smoke-test Windows launch
+        shell: pwsh
+        run: |
+          $executable = "src-tauri/target/debug/skulld-clip-forge.exe"
+          if (-not (Test-Path $executable)) {
+            throw "Expected executable was not built: $executable"
+          }
+
+          $process = Start-Process -FilePath $executable -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) {
+            throw "Skull'd Clip Forge exited during the Windows launch smoke test."
+          }
+
+          Stop-Process -Id $process.Id -Force

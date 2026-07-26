@@ -1,0 +1,114 @@
+use serde::Serialize;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[allow(dead_code)] // The stable contract is implemented before later milestones activate every code.
+pub enum AppErrorCode {
+    #[serde(rename = "E_INVALID_ARGUMENT")]
+    InvalidArgument,
+    #[serde(rename = "E_MEDIA_UNSUPPORTED")]
+    MediaUnsupported,
+    #[serde(rename = "E_SOURCE_MISSING")]
+    SourceMissing,
+    #[serde(rename = "E_SOURCE_CHANGED")]
+    SourceChanged,
+    #[serde(rename = "E_PROJECT_SCHEMA")]
+    ProjectSchema,
+    #[serde(rename = "E_ASSET_MISSING")]
+    AssetMissing,
+    #[serde(rename = "E_DESTINATION_DENIED")]
+    DestinationDenied,
+    #[serde(rename = "E_OUTPUT_EXISTS")]
+    OutputExists,
+    #[serde(rename = "E_DISK_SPACE")]
+    DiskSpace,
+    #[serde(rename = "E_FFPROBE_FAILED")]
+    FfprobeFailed,
+    #[serde(rename = "E_FFMPEG_FAILED")]
+    FfmpegFailed,
+    #[serde(rename = "E_EXPORT_ACTIVE")]
+    ExportActive,
+    #[serde(rename = "E_EXPORT_NOT_FOUND")]
+    ExportNotFound,
+    #[serde(rename = "E_EXPORT_CANCELLED")]
+    ExportCancelled,
+    #[serde(rename = "E_IO")]
+    Io,
+    #[serde(rename = "E_INTERNAL")]
+    Internal,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppError {
+    pub code: AppErrorCode,
+    pub message: String,
+    pub safe_detail: Option<String>,
+    pub retryable: bool,
+}
+
+impl AppError {
+    pub fn media_tool_failed(tool: &str, safe_detail: impl Into<String>) -> Self {
+        let code = match tool {
+            "ffprobe" => AppErrorCode::FfprobeFailed,
+            _ => AppErrorCode::FfmpegFailed,
+        };
+
+        Self {
+            code,
+            message: format!("{tool} is unavailable."),
+            safe_detail: Some(safe_detail.into()),
+            retryable: true,
+        }
+    }
+
+    pub fn internal(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::Internal,
+            message: "The native application encountered an unexpected error.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AppError, AppErrorCode};
+
+    #[test]
+    fn stable_error_codes_match_the_frontend_contract() {
+        let expected = [
+            (AppErrorCode::InvalidArgument, "\"E_INVALID_ARGUMENT\""),
+            (AppErrorCode::MediaUnsupported, "\"E_MEDIA_UNSUPPORTED\""),
+            (AppErrorCode::SourceMissing, "\"E_SOURCE_MISSING\""),
+            (AppErrorCode::SourceChanged, "\"E_SOURCE_CHANGED\""),
+            (AppErrorCode::ProjectSchema, "\"E_PROJECT_SCHEMA\""),
+            (AppErrorCode::AssetMissing, "\"E_ASSET_MISSING\""),
+            (AppErrorCode::DestinationDenied, "\"E_DESTINATION_DENIED\""),
+            (AppErrorCode::OutputExists, "\"E_OUTPUT_EXISTS\""),
+            (AppErrorCode::DiskSpace, "\"E_DISK_SPACE\""),
+            (AppErrorCode::FfprobeFailed, "\"E_FFPROBE_FAILED\""),
+            (AppErrorCode::FfmpegFailed, "\"E_FFMPEG_FAILED\""),
+            (AppErrorCode::ExportActive, "\"E_EXPORT_ACTIVE\""),
+            (AppErrorCode::ExportNotFound, "\"E_EXPORT_NOT_FOUND\""),
+            (AppErrorCode::ExportCancelled, "\"E_EXPORT_CANCELLED\""),
+            (AppErrorCode::Io, "\"E_IO\""),
+            (AppErrorCode::Internal, "\"E_INTERNAL\""),
+        ];
+
+        for (code, serialized) in expected {
+            assert_eq!(serde_json::to_string(&code).unwrap(), serialized);
+        }
+    }
+
+    #[test]
+    fn app_error_uses_the_stable_camel_case_shape() {
+        let error = AppError::media_tool_failed("ffprobe", "Configure ffprobe.");
+        let json = serde_json::to_value(error).unwrap();
+
+        assert_eq!(json["code"], "E_FFPROBE_FAILED");
+        assert_eq!(json["message"], "ffprobe is unavailable.");
+        assert_eq!(json["safeDetail"], "Configure ffprobe.");
+        assert_eq!(json["retryable"], true);
+    }
+}

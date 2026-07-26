@@ -1,0 +1,22 @@
+[package]
+name = "skulld-clip-forge"
+version = "0.1.0"
+description = "Local-first desktop utility for branded vertical gameplay clips"
+authors = ["Skull'd"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "skulld_clip_forge_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
+wait-timeout = "0.2"
+
+[dev-dependencies]
+serde_json = "1"
