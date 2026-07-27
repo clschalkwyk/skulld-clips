@@ -1,0 +1,21 @@
+# Known limitations — internal build
+
+The current package is for internal evaluation, not public distribution.
+
+- Windows 11 x64 is the P0 build and launch target. CI silently installs the
+  internal package and exercises the installed binary's core export path; a
+  complete human-driven editor click-through remains a release-candidate check.
+- The internal debug package is unsigned.
+- FFmpeg and ffprobe are not bundled. Both must already be available on `PATH`,
+  or absolute development overrides must be configured before launch.
+- macOS 13+ remains P1 and public macOS signing/notarization is not configured.
+- Linux packaging is deferred.
+- Public release is blocked on a pinned, checksummed FFmpeg distribution,
+  licence/source records, codec/legal review, and code signing.
+- There is no updater, account, cloud storage, telemetry, analytics, upload, AI,
+  transcription, or publishing integration.
+- The editor supports one source video, one active export, static raster
+  overlays, and a fixed 1080×1920 H.264/AAC output.
+
+Core editing and export run without network access once the local media tools are
+available.

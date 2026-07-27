@@ -1182,7 +1182,7 @@
     />
 
     <footer class="editor-footer">
-      <span>Milestone 4 · Verified local MP4 export</span>
+      <span>Milestone 5 · Hardened local clip workflow</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
 

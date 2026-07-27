@@ -10,15 +10,17 @@ files below it.
 
 ## Current repository state
 
-- The repository currently contains specifications, contracts, diagrams, examples,
-  acceptance tests, and a delivery backlog.
-- It does not yet contain a runnable Tauri/Svelte application, package manifest, or
-  Cargo workspace.
-- Do not claim that an app, build, test, or package command works until the
-  corresponding implementation and configuration exist and the command has been
-  run successfully.
-- Preserve the specification pack as the source of truth while scaffolding the
-  implementation into this repository.
+- The repository contains the specification pack and a runnable Tauri 2, Svelte 5,
+  TypeScript, and Rust implementation covering milestones M0 through M5.
+- The app includes local import/probe, durable projects, trim/crop editing, raster
+  overlays, verified FFmpeg export, cancellation, diagnostics, startup cleanup,
+  generated media fixtures, and an internal Windows package workflow.
+- `npm run verify` is the broad local gate. Media integration additionally requires
+  `SKCF_RUN_MEDIA_INTEGRATION=1 cargo test --manifest-path src-tauri/Cargo.toml --all`.
+- Do not claim a platform package, signing, sidecar, or interactive smoke works
+  until the corresponding command or CI job has completed successfully.
+- Preserve the specification pack as the source of truth when extending the
+  implementation.
 
 ## Read before changing code
 
@@ -147,9 +149,8 @@ explicitly selected.
 
 - Work in dependency order from `delivery/BACKLOG.csv`; reference the relevant
   `SCF-*` item in implementation notes or commits.
-- For the initial slice, follow `delivery/AGENT_PROMPT.md`: scaffold M0, implement
-  safe probing/normalization, and display probe metadata through the typed Rust
-  boundary.
+- The dependency-ordered M0–M5 backlog has an implementation baseline. New work
+  should fix acceptance gaps before adding roadmap scope.
 - Make small, atomic changes. Do not combine scaffolding, contract redesign, media
   pipeline work, and UI polish in one change.
 - Add no dependency unless it has clear value, is version-pinned through the chosen
@@ -164,7 +165,7 @@ explicitly selected.
 
 ## Verification
 
-The only repository-wide checks available before application scaffolding are:
+Specification integrity checks:
 
 ```sh
 shasum -a 256 -c MANIFEST.sha256
@@ -175,10 +176,9 @@ jq empty spec-manifest.json contracts/project.schema.json \
 `MANIFEST.sha256` covers the original specification-pack artifacts. Do not rewrite
 it merely because implementation files are added.
 
-After scaffolding, define and use committed package scripts for formatting, lint,
-type checking, frontend unit/component tests, and browser-harness tests. Pin one
-Node package manager and use its lockfile; do not invent package commands that are
-not declared in the repository.
+Use the committed npm scripts for formatting, lint, type checking, frontend tests,
+builds, and Rust gates. The dependency graph is pinned by `package-lock.json`; do
+not invent package commands that are not declared in the repository.
 
 For Rust changes, run the applicable checks once a Cargo project exists:
 

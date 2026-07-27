@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   windows-milestone-zero:
-    name: Windows checks and launch smoke
+    name: Windows checks, media fixtures, package and launch smoke
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Check out repository
@@ -29,8 +29,27 @@ jobs:
         with:
           components: clippy,rustfmt
 
+      - name: Install pinned FFmpeg test tools
+        shell: pwsh
+        run: |
+          choco install ffmpeg --version=7.1.1 --yes --no-progress
+          Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+          refreshenv
+          ffmpeg -version
+          ffprobe -version
+
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Validate specification and contract files
+        shell: bash
+        run: |
+          shasum -a 256 -c MANIFEST.sha256
+          jq empty spec-manifest.json \
+            contracts/project.schema.json \
+            contracts/export-events.schema.json \
+            examples/example-project.skcf.json \
+            release/RELEASE_MANIFEST.schema.json
 
       - name: Lint frontend
         run: npm run lint
@@ -48,23 +67,84 @@ jobs:
         run: npm run rust:clippy
 
       - name: Test Rust
+        env:
+          SKCF_RUN_MEDIA_INTEGRATION: "1"
         run: npm run rust:test
 
-      - name: Build debug desktop application
-        run: npm run tauri build -- --debug --no-bundle
+      - name: Build internal Windows package
+        run: npm run tauri build -- --debug --bundles nsis
 
-      - name: Smoke-test Windows launch
+      - name: Smoke-test installed Windows export and launch
         shell: pwsh
         run: |
-          $executable = "src-tauri/target/debug/skulld-clip-forge.exe"
-          if (-not (Test-Path $executable)) {
-            throw "Expected executable was not built: $executable"
+          $installer = Get-ChildItem "src-tauri/target/debug/bundle/nsis/*.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "Expected NSIS installer was not built."
+          }
+          $installerProcess = Start-Process -FilePath $installer.FullName -ArgumentList "/S" -PassThru -Wait
+          if ($installerProcess.ExitCode -ne 0) {
+            throw "NSIS installation failed with exit code $($installerProcess.ExitCode)."
+          }
+          $installedExecutable = Get-ChildItem $env:LOCALAPPDATA -Filter "skulld-clip-forge.exe" -File -Recurse |
+            Select-Object -First 1
+          if (-not $installedExecutable) {
+            throw "The installed Skull'd Clip Forge executable was not found."
           }
 
-          $process = Start-Process -FilePath $executable -PassThru
+          $smokeRoot = Join-Path $env:RUNNER_TEMP "skcf-installed-smoke"
+          New-Item -ItemType Directory -Force $smokeRoot | Out-Null
+          $source = Join-Path $smokeRoot "source clip with audio.mp4"
+          $output = Join-Path $smokeRoot "Skull'd output ü.mp4"
+          ffmpeg -hide_banner -loglevel error `
+            -f lavfi -i "testsrc=size=640x360:rate=30:duration=1" `
+            -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=1" `
+            -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest $source
+          $env:SKCF_INTERNAL_EXPORT_SMOKE = "1"
+          $env:SKCF_INTERNAL_SMOKE_SOURCE = $source
+          $env:SKCF_INTERNAL_SMOKE_DESTINATION = $output
+          $env:SKCF_INTERNAL_SMOKE_PROJECTS_ROOT = Join-Path $smokeRoot "projects"
+          & $installedExecutable.FullName
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $output)) {
+            throw "The installed export smoke did not produce an output."
+          }
+          ffprobe -v error -select_streams v:0 `
+            -show_entries stream=codec_name,width,height,pix_fmt `
+            -of default=noprint_wrappers=1 $output
+          Remove-Item Env:SKCF_INTERNAL_EXPORT_SMOKE
+          Remove-Item Env:SKCF_INTERNAL_SMOKE_SOURCE
+          Remove-Item Env:SKCF_INTERNAL_SMOKE_DESTINATION
+          Remove-Item Env:SKCF_INTERNAL_SMOKE_PROJECTS_ROOT
+
+          $process = Start-Process -FilePath $installedExecutable.FullName -PassThru
           Start-Sleep -Seconds 5
           if ($process.HasExited) {
             throw "Skull'd Clip Forge exited during the Windows launch smoke test."
           }
 
           Stop-Process -Id $process.Id -Force
+
+      - name: Create internal release records
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-artifacts | Out-Null
+          $installer = Get-ChildItem "src-tauri/target/debug/bundle/nsis/*.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "Expected NSIS installer was not built."
+          }
+          Copy-Item $installer.FullName release-artifacts/
+          Copy-Item src-tauri/target/debug/skulld-clip-forge.exe release-artifacts/
+          Copy-Item release/THIRD_PARTY_NOTICES.md release-artifacts/
+          Copy-Item release/KNOWN_LIMITATIONS.md release-artifacts/
+          node scripts/write-release-manifest.mjs `
+            --output release-artifacts/release-manifest.json `
+            --artifact src-tauri/target/debug/skulld-clip-forge.exe `
+            --artifact $installer.FullName `
+            --artifact release-artifacts/THIRD_PARTY_NOTICES.md `
+            --artifact release-artifacts/KNOWN_LIMITATIONS.md
+
+      - name: Upload internal Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: skulld-clip-forge-windows-internal
+          path: release-artifacts/
+          if-no-files-found: error

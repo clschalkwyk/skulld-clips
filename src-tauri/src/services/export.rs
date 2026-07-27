@@ -855,7 +855,10 @@ mod tests {
         services::media_tools,
     };
 
-    use super::{partial_output_path, publish_output, verify_output, ExportRegistry};
+    use super::{
+        cleanup_partial, partial_output_path, publish_output, verify_output, ExportRegistry,
+        ManagedChild,
+    };
 
     #[test]
     fn publishing_without_overwrite_never_replaces_an_existing_file() {
@@ -888,6 +891,44 @@ mod tests {
         assert!(registry.is_active());
         registry.finish("job-1");
         assert!(!registry.is_active());
+    }
+
+    #[test]
+    fn cancellation_terminates_the_media_process_and_removes_its_partial_when_enabled() {
+        if std::env::var_os("SKCF_RUN_MEDIA_INTEGRATION").is_none() {
+            return;
+        }
+        let ffmpeg = media_tools::resolve_ffmpeg_path(None).unwrap();
+        let root = std::env::temp_dir().join(format!("skcf-cancel-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let partial = root.join(".cancel-test.partial.mp4");
+        let args = vec![
+            "-hide_banner".into(),
+            "-loglevel".into(),
+            "error".into(),
+            "-nostdin".into(),
+            "-re".into(),
+            "-f".into(),
+            "lavfi".into(),
+            "-i".into(),
+            "testsrc=size=640x360:rate=30".into(),
+            "-t".into(),
+            "10".into(),
+            "-c:v".into(),
+            "libx264".into(),
+            "-pix_fmt".into(),
+            "yuv420p".into(),
+            partial.as_os_str().to_owned(),
+        ];
+        let mut child = ManagedChild::spawn(&ffmpeg, &args).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+
+        child.terminate_tree();
+        cleanup_partial(&partial);
+
+        assert!(child.child.try_wait().unwrap().is_some());
+        assert!(!partial.exists());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

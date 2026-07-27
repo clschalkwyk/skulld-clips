@@ -3,6 +3,7 @@ dist/
 .svelte-kit/
 coverage/
 .playwright-mcp/
+release-artifacts/
 
 src-tauri/target/
 src-tauri/gen/

@@ -4,6 +4,12 @@ mod ffmpeg;
 mod security;
 mod services;
 
+#[cfg(debug_assertions)]
+pub mod internal_smoke;
+
+#[cfg(test)]
+mod media_fixture_tests;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()

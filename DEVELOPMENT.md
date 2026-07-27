@@ -24,6 +24,13 @@ npm ci
 npm run verify
 ```
 
+Run the generated FFmpeg fixture, golden-frame and cancellation integrations:
+
+```sh
+SKCF_RUN_MEDIA_INTEGRATION=1 cargo test \
+  --manifest-path src-tauri/Cargo.toml --all
+```
+
 Run the desktop application:
 
 ```sh
@@ -32,18 +39,18 @@ npm run tauri dev
 
 The frontend dev server binds only to `127.0.0.1:1420`.
 
-## Milestone 0 boundary
+## Implemented baseline
 
-Milestone 0 implements:
+Milestones M0–M5 implement:
 
-- Tauri 2, Svelte 5, TypeScript, Vite, npm, and Cargo scaffolding;
-- strict frontend checks and unit tests;
-- minimal Tauri capabilities without shell or opener permissions;
-- the stable structured `AppError` contract;
-- a single typed frontend invoke adapter;
-- Rust-owned FFmpeg/ffprobe path and version checks;
-- the `get_runtime_info` command and readiness UI;
-- Windows build and launch-smoke CI.
+- the least-privilege Tauri/Svelte/Rust boundary and stable typed contracts;
+- probing, versioned projects, autosave, recents and relink;
+- preview, trim, crop, image overlays and rasterized captions;
+- safe FFmpeg argument/filter construction, progress, process-tree cancellation,
+  output verification and atomic publication;
+- rotating redacted logs, explicit diagnostic ZIPs and startup cleanup;
+- generated media fixtures, decoded-frame golden checks and Windows package CI.
 
-Media probing, project creation, dialogs, editing, and export are intentionally
-deferred to their dependency-ordered backlog items.
+The Windows CI package is an unsigned internal debug build and requires FFmpeg
+and ffprobe on `PATH`. It is not a public release. See `release/` for notices,
+limitations and the generated release-manifest schema.

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skulld.local/schemas/release-manifest.schema.json",
+  "title": "Skull’d Clip Forge internal release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "appVersion",
+    "commit",
+    "targetTriple",
+    "buildTimestamp",
+    "buildMode",
+    "signed",
+    "projectSchemaVersion",
+    "tools",
+    "bundledSidecars",
+    "artifacts"
+  ],
+  "properties": {
+    "formatVersion": { "const": 1 },
+    "appVersion": { "type": "string" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "targetTriple": { "type": "string", "minLength": 1 },
+    "buildTimestamp": { "type": "string", "format": "date-time" },
+    "buildMode": { "const": "internal-unsigned-debug" },
+    "signed": { "const": false },
+    "projectSchemaVersion": { "const": 1 },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rustc", "node", "npm", "ffmpeg", "ffprobe"],
+      "properties": {
+        "rustc": { "type": "string" },
+        "node": { "type": "string" },
+        "npm": { "type": "string" },
+        "ffmpeg": { "type": "string" },
+        "ffprobe": { "type": "string" }
+      }
+    },
+    "bundledSidecars": { "const": false },
+    "sidecars": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["filename", "sizeBytes", "sha256"],
+        "properties": {
+          "filename": { "type": "string", "minLength": 1 },
+          "sizeBytes": { "type": "integer", "minimum": 1 },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

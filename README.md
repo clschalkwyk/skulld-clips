@@ -24,3 +24,23 @@ Included: one local source video, trim, locked 9:16 crop, static image overlays,
 Excluded: accounts, cloud, AI, transcription, publishing APIs, multiple video tracks, transitions, keyframes, collaboration, mobile apps and general-purpose frontend shell access.
 
 The project is meant to be useful and finishable. It is not meant to become Adobe Premiere after three enthusiastic evenings.
+
+## Implementation status
+
+The repository now contains the runnable M0–M5 implementation:
+
+- local file import, safe ffprobe normalization, versioned projects, autosave,
+  recents and relink;
+- video preview, trim, locked 9:16 crop, image overlays and rasterized captions;
+- one Rust-owned FFmpeg export with structured progress, clean cancellation,
+  ffprobe verification and atomic publication;
+- redacted rotating logs, explicit diagnostic ZIP creation and stale app-owned
+  cache/partial cleanup;
+- generated media fixtures, decoded-frame golden checks and an internal Windows
+  package workflow.
+
+Start with [DEVELOPMENT.md](DEVELOPMENT.md) and review the
+[acceptance evidence](quality/ACCEPTANCE_STATUS.md). Public distribution remains
+blocked on pinned/checksummed FFmpeg sidecars, release-specific licence records
+and code signing; see
+[release/KNOWN_LIMITATIONS.md](release/KNOWN_LIMITATIONS.md).
