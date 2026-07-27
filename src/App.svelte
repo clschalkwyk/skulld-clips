@@ -4,8 +4,12 @@
   import type {
     AppError,
     LoadProjectResult,
+    NormalizedRect,
     RecentProject,
   } from "../contracts/types";
+  import CropInspector from "./components/editor/CropInspector.svelte";
+  import PreviewStage from "./components/editor/PreviewStage.svelte";
+  import Timeline from "./components/editor/Timeline.svelte";
   import type { RuntimeInfo } from "./contracts/runtime";
   import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
   import {
@@ -14,6 +18,7 @@
     listRecentProjects,
     listenForFileDrops,
     loadProject,
+    mediaPreviewUrl,
     normalizeAppError,
     relinkSource,
     removeRecentProject,
@@ -21,6 +26,13 @@
     selectMediaFile,
     selectProjectFile,
   } from "./services/tauri";
+  import {
+    approximateFrameStepMs,
+    clampPlayhead,
+    isTypingTarget,
+    setTrimIn,
+    setTrimOut,
+  } from "./services/timeline";
 
   type BusyAction = "importing" | "opening" | "relinking" | null;
   type SaveState = "saved" | "unsaved" | "saving" | "error";
@@ -35,6 +47,9 @@
   let dropActive = $state(false);
   let saveState = $state<SaveState>("saved");
   let pendingReplacementPath = $state<string | null>(null);
+  let playheadMs = $state(0);
+  let playing = $state(false);
+  let previewError = $state<string | null>(null);
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
@@ -45,6 +60,15 @@
       : session?.sourceStatus === "changed"
         ? "Source changed"
         : "Source verified",
+  );
+  const sourceSize = $derived({
+    width: session?.project.source.probe.video.displayWidth ?? 1,
+    height: session?.project.source.probe.video.displayHeight ?? 1,
+  });
+  const previewUrl = $derived(
+    session?.sourceStatus === "ok"
+      ? mediaPreviewUrl(session.project.source.path)
+      : null,
   );
 
   onMount(() => {
@@ -157,6 +181,9 @@
     autosave?.dispose();
     session = next;
     pendingReplacementPath = null;
+    playheadMs = next.project.timeline.inMs;
+    playing = false;
+    previewError = null;
     saveState = "saved";
     autosave = createAutosaveScheduler(persistProject);
   }
@@ -166,8 +193,70 @@
       return;
     }
     session.project.name = (event.currentTarget as HTMLInputElement).value;
+    markProjectDirty();
+  }
+
+  function markProjectDirty(): void {
     saveState = "unsaved";
     autosave?.markDirty();
+  }
+
+  function updateCrop(crop: NormalizedRect): void {
+    if (!session || session.sourceStatus !== "ok") {
+      return;
+    }
+    session.project.crop = crop;
+    markProjectDirty();
+  }
+
+  function updateTrimIn(requestedMs: number): void {
+    if (!session) {
+      return;
+    }
+    const timeline = session.project.timeline;
+    timeline.inMs = setTrimIn(
+      requestedMs,
+      timeline.outMs,
+      session.project.source.probe.durationMs,
+    );
+    playheadMs = clampPlayhead(playheadMs, timeline.inMs, timeline.outMs);
+    markProjectDirty();
+  }
+
+  function updateTrimOut(requestedMs: number): void {
+    if (!session) {
+      return;
+    }
+    const timeline = session.project.timeline;
+    timeline.outMs = setTrimOut(
+      requestedMs,
+      timeline.inMs,
+      session.project.source.probe.durationMs,
+    );
+    playheadMs = clampPlayhead(playheadMs, timeline.inMs, timeline.outMs);
+    markProjectDirty();
+  }
+
+  function updatePlayhead(requestedMs: number): void {
+    if (!session) {
+      return;
+    }
+    playheadMs = clampPlayhead(
+      requestedMs,
+      session.project.timeline.inMs,
+      session.project.timeline.outMs,
+    );
+  }
+
+  function updatePlaying(next: boolean): void {
+    if (!session || session.sourceStatus !== "ok") {
+      playing = false;
+      return;
+    }
+    if (next && playheadMs >= session.project.timeline.outMs) {
+      playheadMs = session.project.timeline.inMs;
+    }
+    playing = next;
   }
 
   async function persistProject(): Promise<void> {
@@ -192,6 +281,7 @@
   }
 
   async function backToHome(): Promise<void> {
+    playing = false;
     await autosave?.flush();
     autosave?.dispose();
     autosave = null;
@@ -232,6 +322,9 @@
       );
       session.project = result.project;
       session.sourceStatus = "ok";
+      playheadMs = result.project.timeline.inMs;
+      playing = false;
+      previewError = null;
       pendingReplacementPath = null;
       saveState = "saved";
       await refreshRecents();
@@ -272,11 +365,59 @@
           timeStyle: "short",
         });
   }
+
+  function handleShortcut(event: KeyboardEvent): void {
+    if (!session || (isTypingTarget(event.target) && event.key !== "Escape")) {
+      return;
+    }
+    const timeline = session.project.timeline;
+    const modifier = event.metaKey || event.ctrlKey;
+    if (modifier && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      void autosave?.flush();
+      return;
+    }
+    switch (event.key) {
+      case " ":
+        event.preventDefault();
+        updatePlaying(!playing);
+        break;
+      case "i":
+      case "I":
+        event.preventDefault();
+        updateTrimIn(playheadMs);
+        break;
+      case "o":
+      case "O":
+        event.preventDefault();
+        updateTrimOut(playheadMs);
+        break;
+      case "ArrowLeft":
+      case "ArrowRight": {
+        event.preventDefault();
+        const direction = event.key === "ArrowLeft" ? -1 : 1;
+        const delta = event.shiftKey
+          ? 1_000
+          : approximateFrameStepMs(session.project.source.probe);
+        updatePlayhead(playheadMs + direction * delta);
+        break;
+      }
+      case "Home":
+        event.preventDefault();
+        updatePlayhead(timeline.inMs);
+        break;
+      case "End":
+        event.preventDefault();
+        updatePlayhead(timeline.outMs);
+        break;
+    }
+  }
 </script>
 
 <svelte:head>
   <title>Skull’d Clip Forge</title>
 </svelte:head>
+<svelte:window onkeydown={handleShortcut} />
 
 {#if session}
   <main class="editor-shell">
@@ -352,13 +493,24 @@
       </aside>
 
       <section class="preview-panel" aria-labelledby="preview-heading">
-        <div class="preview-stage">
-          <div class="canvas-frame">
-            <span>9:16</span>
-            <strong id="preview-heading">Preview workspace</strong>
-            <small>Interactive playback and crop controls arrive in M2.</small>
-          </div>
-        </div>
+        <h2 id="preview-heading" class="visually-hidden">Local video preview and crop</h2>
+        <PreviewStage
+          sourceUrl={previewUrl}
+          sourceFilename={session.project.source.filename}
+          sourceStatus={session.sourceStatus}
+          {sourceSize}
+          crop={session.project.crop}
+          {playheadMs}
+          {playing}
+          outMs={session.project.timeline.outMs}
+          onCropChange={updateCrop}
+          onPlayheadChange={updatePlayhead}
+          onPlayingChange={updatePlaying}
+          onPreviewError={(message) => (previewError = message)}
+        />
+        {#if previewError}
+          <div class="preview-error" role="alert">{previewError}</div>
+        {/if}
         <div class="source-meta">
           <span>{session.project.source.probe.video.displayWidth} × {session.project.source.probe.video.displayHeight}</span>
           <span>{formatDuration(session.project.source.probe.durationMs)}</span>
@@ -367,13 +519,20 @@
       </section>
 
       <aside class="panel inspector-panel">
-        <p class="section-label">Source</p>
-        <h2>{sourceStatusLabel}</h2>
+        <CropInspector
+          crop={session.project.crop}
+          {sourceSize}
+          disabled={session.sourceStatus !== "ok"}
+          onChange={updateCrop}
+        />
         <dl class="detail-list">
           <div><dt>Codec</dt><dd>{session.project.source.probe.video.codec}</dd></div>
           <div><dt>Container</dt><dd>{session.project.source.probe.containerName}</dd></div>
           <div><dt>Rotation</dt><dd>{session.project.source.probe.video.rotationDegrees}°</dd></div>
-          <div><dt>Trim</dt><dd>Full source</dd></div>
+          <div>
+            <dt>Status</dt>
+            <dd>{sourceStatusLabel}</dd>
+          </div>
         </dl>
         {#if session.project.source.probe.warnings.length > 0}
           <div class="probe-warnings">
@@ -386,8 +545,21 @@
       </aside>
     </section>
 
+    <Timeline
+      durationMs={session.project.source.probe.durationMs}
+      inMs={session.project.timeline.inMs}
+      outMs={session.project.timeline.outMs}
+      {playheadMs}
+      {playing}
+      disabled={session.sourceStatus !== "ok"}
+      onInChange={updateTrimIn}
+      onOutChange={updateTrimOut}
+      onPlayheadChange={updatePlayhead}
+      onPlayingChange={updatePlaying}
+    />
+
     <footer class="editor-footer">
-      <span>Milestone 1 · Import, projects, autosave</span>
+      <span>Milestone 2 · Preview, trim, locked crop</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
   </main>

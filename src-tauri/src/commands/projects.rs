@@ -62,8 +62,10 @@ pub async fn select_media_file(
     app: AppHandle,
     paths: State<'_, PathPolicy>,
 ) -> Result<Option<String>, AppError> {
+    let dialog_app = app.clone();
     let selected = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
+        dialog_app
+            .dialog()
             .file()
             .add_filter(
                 "Gameplay video",
@@ -73,7 +75,13 @@ pub async fn select_media_file(
     })
     .await
     .map_err(|_| AppError::internal("The file dialog did not complete."))?;
-    authorize_selected_file(selected, &paths)
+    let selected = authorize_selected_file(selected, &paths)?;
+    if let Some(path) = &selected {
+        app.asset_protocol_scope()
+            .allow_file(path)
+            .map_err(|_| AppError::internal("The media preview path could not be authorized."))?;
+    }
+    Ok(selected)
 }
 
 #[tauri::command]
@@ -196,6 +204,11 @@ pub async fn load_project(
         source_status: loaded.source_status,
         migration_applied: false,
     };
+    if response.source_status == projects::SourceStatus::Ok {
+        app.asset_protocol_scope()
+            .allow_file(&response.project.source.path)
+            .map_err(|_| AppError::internal("The media preview path could not be authorized."))?;
+    }
     record_recent(
         &app,
         &response.project_path,
@@ -255,6 +268,9 @@ pub async fn relink_source(
     })
     .await
     .map_err(|_| AppError::internal("Source relinking did not complete."))??;
+    app.asset_protocol_scope()
+        .allow_file(&relinked.project.source.path)
+        .map_err(|_| AppError::internal("The media preview path could not be authorized."))?;
     update_recent(
         &app,
         &recent_path,

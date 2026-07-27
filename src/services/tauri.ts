@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
@@ -184,4 +184,8 @@ export function listenForFileDrops(
         break;
     }
   });
+}
+
+export function mediaPreviewUrl(path: string): string {
+  return convertFileSrc(path);
 }
