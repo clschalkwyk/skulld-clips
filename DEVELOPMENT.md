@@ -24,6 +24,9 @@ npm ci
 npm run verify
 ```
 
+`npm run verify:spec` is the cross-platform specification checksum and contract
+JSON gate used by CI.
+
 Run the generated FFmpeg fixture, golden-frame and cancellation integrations:
 
 ```sh

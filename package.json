@@ -17,7 +17,8 @@
     "rust:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
     "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --all",
     "rust:check": "npm run rust:fmt && npm run rust:clippy && npm run rust:test",
-    "verify": "npm run lint && npm run check && npm test && npm run build && npm run rust:check",
+    "verify:spec": "node scripts/validate-spec.mjs",
+    "verify": "npm run verify:spec && npm run lint && npm run check && npm test && npm run build && npm run rust:check",
     "tauri": "tauri"
   },
   "engines": {
