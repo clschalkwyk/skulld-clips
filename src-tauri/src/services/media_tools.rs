@@ -67,6 +67,10 @@ pub fn resolve_ffprobe_path(resource_dir: Option<&Path>) -> Result<PathBuf, AppE
     resolve_media_tool(MediaTool::Ffprobe, resource_dir).map(|tool| tool.path)
 }
 
+pub fn resolve_ffmpeg_path(resource_dir: Option<&Path>) -> Result<PathBuf, AppError> {
+    resolve_media_tool(MediaTool::Ffmpeg, resource_dir).map(|tool| tool.path)
+}
+
 fn resolve_media_tool(
     tool: MediaTool,
     resource_dir: Option<&Path>,

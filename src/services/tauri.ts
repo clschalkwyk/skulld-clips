@@ -1,12 +1,15 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type { AppError, RuntimeInfo } from "../contracts/runtime";
 import type {
   AppErrorCode,
   AssetRef,
   CreateProjectResult,
+  ExportEvent,
+  ExportRequest,
+  ExportValidation,
   LoadProjectResult,
   MediaProbe,
   ProjectV1,
@@ -14,6 +17,15 @@ import type {
   RelinkSourceResult,
   SaveProjectResult,
 } from "../../contracts/types";
+
+export interface StartExportResponse {
+  jobId: string;
+  acceptedAt: string;
+}
+
+export interface CancelExportResponse {
+  accepted: boolean;
+}
 
 export type InvokeFn = <T>(
   command: string,
@@ -196,6 +208,59 @@ export function writeCaptionAsset(
     { projectPath, contentHash, pngBytesBase64, width, height },
     invokeCommand,
   );
+}
+
+export function selectExportDestination(
+  suggestedName: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<string | null> {
+  return invokeNative(
+    "select_export_destination",
+    { suggestedName },
+    invokeCommand,
+  );
+}
+
+export function validateExport(
+  request: ExportRequest,
+  invokeCommand: InvokeFn = invoke,
+): Promise<ExportValidation> {
+  return invokeNative("validate_export", { request }, invokeCommand);
+}
+
+export function startExport(
+  request: ExportRequest,
+  invokeCommand: InvokeFn = invoke,
+): Promise<StartExportResponse> {
+  return invokeNative("start_export", { request }, invokeCommand);
+}
+
+export function cancelExport(
+  jobId: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<CancelExportResponse> {
+  return invokeNative("cancel_export", { jobId }, invokeCommand);
+}
+
+export async function listenForExportEvents(
+  onEvent: (event: ExportEvent) => void,
+): Promise<UnlistenFn> {
+  const eventNames: ExportEvent["event"][] = [
+    "export://progress",
+    "export://completed",
+    "export://failed",
+    "export://cancelled",
+  ];
+  const unlisteners = await Promise.all(
+    eventNames.map((eventName) =>
+      listen<ExportEvent>(eventName, ({ payload }) => onEvent(payload)),
+    ),
+  );
+  return () => {
+    for (const unlisten of unlisteners) {
+      unlisten();
+    }
+  };
 }
 
 export function listenForFileDrops(

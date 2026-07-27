@@ -13,6 +13,12 @@ use crate::{
 const PROBE_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_PROBE_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
 
+pub struct ProbedMedia {
+    pub probe: MediaProbe,
+    pub usable_video_streams: usize,
+    pub audio_streams: usize,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawProbe {
     #[serde(default)]
@@ -74,6 +80,13 @@ pub fn probe_media(
     source_path: &Path,
     resource_dir: Option<&Path>,
 ) -> Result<MediaProbe, AppError> {
+    probe_media_details(source_path, resource_dir).map(|details| details.probe)
+}
+
+pub fn probe_media_details(
+    source_path: &Path,
+    resource_dir: Option<&Path>,
+) -> Result<ProbedMedia, AppError> {
     let metadata = fs::metadata(source_path).map_err(|_| AppError::source_missing())?;
     if !metadata.is_file() {
         return Err(AppError::invalid_argument(
@@ -102,9 +115,31 @@ pub fn probe_media(
         ));
     }
 
-    normalize_probe_json(&output.stdout, metadata.len())
+    let raw: RawProbe = serde_json::from_slice(&output.stdout).map_err(|_| {
+        AppError::media_tool_failed(
+            "ffprobe",
+            "ffprobe returned malformed metadata instead of valid JSON.",
+        )
+    })?;
+    let usable_video_streams = raw
+        .streams
+        .iter()
+        .filter(|stream| is_usable_video_stream(stream))
+        .count();
+    let audio_streams = raw
+        .streams
+        .iter()
+        .filter(|stream| stream.codec_type.as_deref() == Some("audio"))
+        .count();
+    let probe = normalize_raw_probe_checked(raw, metadata.len())?;
+    Ok(ProbedMedia {
+        probe,
+        usable_video_streams,
+        audio_streams,
+    })
 }
 
+#[cfg(test)]
 pub fn normalize_probe_json(bytes: &[u8], file_size_bytes: u64) -> Result<MediaProbe, AppError> {
     let raw: RawProbe = serde_json::from_slice(bytes).map_err(|_| {
         AppError::media_tool_failed(
@@ -113,6 +148,13 @@ pub fn normalize_probe_json(bytes: &[u8], file_size_bytes: u64) -> Result<MediaP
         )
     })?;
 
+    normalize_raw_probe_checked(raw, file_size_bytes)
+}
+
+fn normalize_raw_probe_checked(
+    raw: RawProbe,
+    file_size_bytes: u64,
+) -> Result<MediaProbe, AppError> {
     if raw
         .error
         .as_ref()
@@ -204,26 +246,26 @@ fn normalize_raw_probe(raw: RawProbe, file_size_bytes: u64) -> Result<MediaProbe
 }
 
 fn select_video_stream(streams: &[RawStream]) -> Option<&RawStream> {
-    let usable = |stream: &&RawStream| {
-        stream.codec_type.as_deref() == Some("video")
-            && stream.width.unwrap_or_default() > 0
-            && stream.height.unwrap_or_default() > 0
-            && stream
-                .disposition
-                .as_ref()
-                .map_or(true, |disposition| disposition.attached_pic == 0)
-    };
-
     streams
         .iter()
-        .filter(usable)
+        .filter(|stream| is_usable_video_stream(stream))
         .find(|stream| {
             stream
                 .disposition
                 .as_ref()
                 .is_some_and(|disposition| disposition.default == 1)
         })
-        .or_else(|| streams.iter().find(usable))
+        .or_else(|| streams.iter().find(|stream| is_usable_video_stream(stream)))
+}
+
+fn is_usable_video_stream(stream: &RawStream) -> bool {
+    stream.codec_type.as_deref() == Some("video")
+        && stream.width.unwrap_or_default() > 0
+        && stream.height.unwrap_or_default() > 0
+        && stream
+            .disposition
+            .as_ref()
+            .map_or(true, |disposition| disposition.attached_pic == 0)
 }
 
 fn select_audio_stream(streams: &[RawStream]) -> Option<&RawStream> {

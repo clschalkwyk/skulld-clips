@@ -103,6 +103,64 @@ impl AppError {
         }
     }
 
+    pub fn destination_denied(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::DestinationDenied,
+            message: "The export destination is not writable.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn output_exists() -> Self {
+        Self {
+            code: AppErrorCode::OutputExists,
+            message: "A file already exists at the export destination.".to_owned(),
+            safe_detail: Some(
+                "Choose another filename or explicitly confirm replacement.".to_owned(),
+            ),
+            retryable: false,
+        }
+    }
+
+    pub fn disk_space(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::DiskSpace,
+            message: "There is not enough free space for this export.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn export_active() -> Self {
+        Self {
+            code: AppErrorCode::ExportActive,
+            message: "Another export is already active.".to_owned(),
+            safe_detail: Some(
+                "Wait for it to finish or cancel it before starting another.".to_owned(),
+            ),
+            retryable: false,
+        }
+    }
+
+    pub fn export_not_found() -> Self {
+        Self {
+            code: AppErrorCode::ExportNotFound,
+            message: "The export job is no longer active.".to_owned(),
+            safe_detail: Some("Refresh the export state before trying again.".to_owned()),
+            retryable: false,
+        }
+    }
+
+    pub fn ffmpeg_failed(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::FfmpegFailed,
+            message: "The video export failed.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: true,
+        }
+    }
+
     pub fn io(message: impl Into<String>, safe_detail: impl Into<String>) -> Self {
         Self {
             code: AppErrorCode::Io,

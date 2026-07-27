@@ -4,6 +4,8 @@
   import type {
     AppError,
     CaptionStyle,
+    ExportRequest,
+    ExportSettings,
     LoadProjectResult,
     NormalizedRect,
     Overlay,
@@ -14,9 +16,16 @@
   import OverlayInspector from "./components/editor/OverlayInspector.svelte";
   import PreviewStage from "./components/editor/PreviewStage.svelte";
   import Timeline from "./components/editor/Timeline.svelte";
+  import ExportPanel from "./components/export/ExportPanel.svelte";
   import type { RuntimeInfo } from "./contracts/runtime";
   import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
   import { renderCaption } from "./services/caption-renderer";
+  import {
+    createExportState,
+    exportIsActive,
+    reduceExportEvent,
+    type ExportState,
+  } from "./services/export-state";
   import {
     createCaptionOverlay,
     createImageOverlay,
@@ -26,10 +35,12 @@
     replaceOverlayAsset,
   } from "./services/overlay-model";
   import {
+    cancelExport,
     createProject,
     getRuntimeInfo,
     importOverlayAsset,
     listRecentProjects,
+    listenForExportEvents,
     listenForFileDrops,
     loadProject,
     mediaPreviewUrl,
@@ -37,9 +48,12 @@
     relinkSource,
     removeRecentProject,
     saveProject,
+    selectExportDestination,
     selectMediaFile,
     selectOverlayFile,
     selectProjectFile,
+    startExport,
+    validateExport,
     writeCaptionAsset,
   } from "./services/tauri";
   import {
@@ -70,9 +84,14 @@
   let selectedOverlayId = $state<string | null>(null);
   let overlayBusy = $state(false);
   let captionStatus = $state<CaptionStatus>("idle");
+  let exportOpen = $state(false);
+  let exportDestination = $state("");
+  let exportOverwriteConfirmed = $state(false);
+  let exportState = $state<ExportState>(createExportState());
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
+  let unlistenExport: (() => void) | null = null;
   let captionRenderTimer: ReturnType<typeof setTimeout> | null = null;
   let captionRenderPromise: Promise<void> | null = null;
   let captionRenderError: AppError | null = null;
@@ -103,6 +122,7 @@
     void bootstrap();
     return () => {
       unlistenDrop?.();
+      unlistenExport?.();
       autosave?.dispose();
       if (captionRenderTimer) {
         clearTimeout(captionRenderTimer);
@@ -119,16 +139,21 @@
       runtimeError = normalizeAppError(runtimeResult.reason);
     }
     try {
-      unlistenDrop = await listenForFileDrops(
-        (paths) => {
-          if (!session && paths[0]) {
-            void importClip(paths[0]);
-          }
-        },
-        (active) => {
-          dropActive = active;
-        },
-      );
+      [unlistenDrop, unlistenExport] = await Promise.all([
+        listenForFileDrops(
+          (paths) => {
+            if (!session && paths[0]) {
+              void importClip(paths[0]);
+            }
+          },
+          (active) => {
+            dropActive = active;
+          },
+        ),
+        listenForExportEvents((event) => {
+          exportState = reduceExportEvent(exportState, event);
+        }),
+      ]);
     } catch (error) {
       runtimeError = normalizeAppError(error);
     }
@@ -221,7 +246,154 @@
     captionStatus = "idle";
     captionRenderError = null;
     saveState = "saved";
+    exportOpen = false;
+    exportDestination = "";
+    exportOverwriteConfirmed = false;
+    exportState = createExportState();
     autosave = createAutosaveScheduler(persistProject);
+  }
+
+  function openExport(): void {
+    if (!session || session.sourceStatus !== "ok") {
+      return;
+    }
+    if (
+      exportState.status === "completed" ||
+      exportState.status === "cancelled" ||
+      exportState.status === "error"
+    ) {
+      exportState = createExportState();
+    }
+    playing = false;
+    exportOpen = true;
+  }
+
+  function closeExport(): void {
+    if (exportIsActive(exportState)) {
+      return;
+    }
+    exportOpen = false;
+  }
+
+  function updateExportSettings(settings: ExportSettings): void {
+    if (!session || exportIsActive(exportState)) {
+      return;
+    }
+    session.project.exportDefaults = settings;
+    exportState = createExportState();
+    exportOverwriteConfirmed = false;
+    markProjectDirty();
+  }
+
+  async function chooseExportDestination(): Promise<void> {
+    if (!session || exportIsActive(exportState)) {
+      return;
+    }
+    try {
+      const destination = await selectExportDestination(
+        `${session.project.name}.mp4`,
+      );
+      if (destination) {
+        exportDestination = destination;
+        exportOverwriteConfirmed = false;
+        exportState = createExportState();
+      }
+    } catch (error) {
+      exportState = {
+        ...createExportState(),
+        status: "error",
+        error: normalizeAppError(error),
+      };
+    }
+  }
+
+  function createExportRequest(): ExportRequest | null {
+    if (!session || !exportDestination) {
+      return null;
+    }
+    return {
+      projectPath: session.projectPath,
+      projectSnapshot: structuredClone(session.project),
+      destinationPath: exportDestination,
+      overwrite: exportOverwriteConfirmed,
+      settings: structuredClone(session.project.exportDefaults),
+    };
+  }
+
+  async function startCurrentExport(): Promise<void> {
+    if (!session || exportIsActive(exportState)) {
+      return;
+    }
+    if (!exportDestination) {
+      await chooseExportDestination();
+      return;
+    }
+    exportState = {
+      ...createExportState(),
+      status: "validating",
+    };
+    try {
+      await flushPendingCaptionRender();
+      await autosave?.flush();
+      if (saveState === "error") {
+        throw actionError ?? {
+          code: "E_IO",
+          message: "The project could not be saved before export.",
+          safeDetail: "Resolve the save error, then retry export.",
+          retryable: true,
+        };
+      }
+      const request = createExportRequest();
+      if (!request) {
+        return;
+      }
+      const validation = await validateExport(request);
+      if (!validation.valid) {
+        exportState = {
+          ...createExportState(),
+          validation,
+        };
+        return;
+      }
+      exportState = {
+        ...createExportState(),
+        status: "starting",
+        validation,
+      };
+      const started = await startExport(request);
+      if (exportState.status === "starting" && exportState.jobId === null) {
+        exportState = {
+          ...exportState,
+          status: "running",
+          jobId: started.jobId,
+        };
+      }
+    } catch (error) {
+      exportState = {
+        ...exportState,
+        status: "error",
+        phase: null,
+        error: normalizeAppError(error),
+      };
+    }
+  }
+
+  async function cancelCurrentExport(): Promise<void> {
+    const jobId = exportState.jobId;
+    if (!jobId || !exportIsActive(exportState)) {
+      return;
+    }
+    exportState = { ...exportState, cancelRequested: true };
+    try {
+      await cancelExport(jobId);
+    } catch (error) {
+      exportState = {
+        ...exportState,
+        status: "error",
+        error: normalizeAppError(error),
+        cancelRequested: false,
+      };
+    }
   }
 
   function updateProjectName(event: Event): void {
@@ -598,6 +770,10 @@
   }
 
   async function backToHome(): Promise<void> {
+    if (exportIsActive(exportState)) {
+      exportOpen = true;
+      return;
+    }
     playing = false;
     await autosave?.flush();
     if (saveState === "error") {
@@ -714,9 +890,21 @@
     }
     const timeline = session.project.timeline;
     const modifier = event.metaKey || event.ctrlKey;
+    if (exportOpen) {
+      if (event.key === "Escape" && !exportIsActive(exportState)) {
+        event.preventDefault();
+        closeExport();
+      }
+      return;
+    }
     if (modifier && event.key.toLowerCase() === "s") {
       event.preventDefault();
       void autosave?.flush();
+      return;
+    }
+    if (modifier && event.key.toLowerCase() === "e") {
+      event.preventDefault();
+      openExport();
       return;
     }
     switch (event.key) {
@@ -793,7 +981,13 @@
               ? "Waiting to save"
               : "Save failed"}
       </span>
-      <button class="primary-button" type="button" disabled title="Export arrives in M4">
+      <button
+        class="primary-button"
+        type="button"
+        onclick={openExport}
+        disabled={session.sourceStatus !== "ok"}
+        title="Export vertical MP4 (Ctrl/Cmd+E)"
+      >
         Export
       </button>
     </header>
@@ -934,9 +1128,26 @@
     />
 
     <footer class="editor-footer">
-      <span>Milestone 3 · Preview, crop, overlays, captions</span>
+      <span>Milestone 4 · Verified local MP4 export</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
+
+    {#if exportOpen}
+      <ExportPanel
+        projectName={session.project.name}
+        settings={session.project.exportDefaults}
+        sourceHasAudio={session.project.source.probe.hasAudio}
+        destinationPath={exportDestination}
+        overwriteConfirmed={exportOverwriteConfirmed}
+        state={exportState}
+        onSettingsChange={updateExportSettings}
+        onChooseDestination={chooseExportDestination}
+        onOverwriteChange={(confirmed) => (exportOverwriteConfirmed = confirmed)}
+        onStart={startCurrentExport}
+        onCancel={cancelCurrentExport}
+        onClose={closeExport}
+      />
+    {/if}
   </main>
 {:else}
   <main class="home-shell">

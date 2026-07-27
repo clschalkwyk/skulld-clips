@@ -1,5 +1,6 @@
 mod commands;
 mod domain;
+mod ffmpeg;
 mod security;
 mod services;
 
@@ -9,6 +10,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(security::path_policy::PathPolicy::default())
+        .manage(services::export::ExportRegistry::default())
         .on_webview_event(|webview, event| {
             if let tauri::WebviewEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
                 use tauri::Manager;
@@ -25,6 +27,10 @@ pub fn run() {
             commands::assets::select_overlay_file,
             commands::assets::import_overlay_asset,
             commands::assets::write_caption_asset,
+            commands::export::select_export_destination,
+            commands::export::validate_export,
+            commands::export::start_export,
+            commands::export::cancel_export,
             commands::projects::select_media_file,
             commands::projects::select_project_file,
             commands::projects::select_projects_folder,

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { RuntimeInfo } from "../contracts/runtime";
 import {
+  cancelExport,
   createProject,
   getRuntimeInfo,
   importOverlayAsset,
@@ -9,10 +10,13 @@ import {
   normalizeAppError,
   projectAssetPath,
   saveProject,
+  selectExportDestination,
+  startExport,
+  validateExport,
   writeCaptionAsset,
   type InvokeFn,
 } from "./tauri";
-import type { ProjectV1 } from "../../contracts/types";
+import type { ExportRequest, ProjectV1 } from "../../contracts/types";
 
 const runtimeInfo: RuntimeInfo = {
   appVersion: "0.1.0",
@@ -115,5 +119,32 @@ describe("project commands", () => {
         "assets/captions/hash.png",
       ),
     ).toBe("C:\\Projects\\id\\assets\\captions\\hash.png");
+  });
+
+  it("keeps export commands behind typed request payloads", async () => {
+    const invokeCommand = vi.fn(async () => ({})) as InvokeFn;
+    const request = {
+      projectPath: "/projects/id/project.skcf.json",
+    } as ExportRequest;
+
+    await selectExportDestination("Boss fight.mp4", invokeCommand);
+    await validateExport(request, invokeCommand);
+    await startExport(request, invokeCommand);
+    await cancelExport("job-1", invokeCommand);
+
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      1,
+      "select_export_destination",
+      { suggestedName: "Boss fight.mp4" },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(2, "validate_export", {
+      request,
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(3, "start_export", {
+      request,
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(4, "cancel_export", {
+      jobId: "job-1",
+    });
   });
 });

@@ -96,6 +96,12 @@ pub enum Overlay {
 }
 
 impl Overlay {
+    pub fn base(&self) -> &OverlayBase {
+        match self {
+            Self::Image { base, .. } | Self::Caption { base, .. } => base,
+        }
+    }
+
     pub fn asset(&self) -> (&AssetRef, ProjectAssetKind) {
         match self {
             Self::Image { asset, .. } => (asset, ProjectAssetKind::Overlay),
