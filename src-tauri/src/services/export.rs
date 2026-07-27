@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use uuid::Uuid;
 
 use crate::{
@@ -98,6 +98,14 @@ impl ExportRegistry {
         }
         active.cancel_requested.store(true, Ordering::SeqCst);
         Ok(true)
+    }
+
+    pub fn cancel_active(&self) {
+        if let Ok(active) = self.active.lock() {
+            if let Some(active) = active.as_ref() {
+                active.cancel_requested.store(true, Ordering::SeqCst);
+            }
+        }
     }
 
     pub fn finish(&self, job_id: &str) {
@@ -245,6 +253,8 @@ pub fn run_export(
     cancel_requested: Arc<AtomicBool>,
     prepared: PreparedExport,
 ) {
+    app.state::<crate::services::diagnostics::Diagnostics>()
+        .record("info", "export_started", None);
     let total_ms = prepared.project.timeline.out_ms - prepared.project.timeline.in_ms;
     emit_progress(
         &app,
@@ -263,6 +273,8 @@ pub fn run_export(
     registry.finish(&job_id);
     match result {
         Ok(verified) => {
+            app.state::<crate::services::diagnostics::Diagnostics>()
+                .record("info", "export_completed", None);
             let _ = app.emit(
                 "export://completed",
                 ExportCompletedEvent {
@@ -275,6 +287,8 @@ pub fn run_export(
             );
         }
         Err(ExportRunError::Cancelled) => {
+            app.state::<crate::services::diagnostics::Diagnostics>()
+                .record("info", "export_cancelled", None);
             let _ = app.emit(
                 "export://cancelled",
                 ExportCancelledEvent {
@@ -284,6 +298,8 @@ pub fn run_export(
             );
         }
         Err(ExportRunError::Failed(error)) => {
+            app.state::<crate::services::diagnostics::Diagnostics>()
+                .record("error", "export_failed", Some(&error));
             let _ = app.emit(
                 "export://failed",
                 ExportFailedEvent {
@@ -762,9 +778,7 @@ impl ManagedChild {
                     size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
                 )
             };
-            let assigned = unsafe {
-                AssignProcessToJobObject(job_handle, child.as_raw_handle() as *mut c_void)
-            };
+            let assigned = unsafe { AssignProcessToJobObject(job_handle, child.as_raw_handle()) };
             if configured == 0 || assigned == 0 {
                 unsafe {
                     CloseHandle(job_handle);
@@ -775,7 +789,7 @@ impl ManagedChild {
                     "FFmpeg could not be assigned to its Windows process group.",
                 ));
             }
-            return Ok(Self { child, job_handle });
+            Ok(Self { child, job_handle })
         }
 
         #[cfg(not(windows))]
@@ -824,7 +838,14 @@ impl Drop for ManagedChild {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, process::Command};
+    use std::{
+        fs,
+        process::Command,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
 
     use uuid::Uuid;
 
@@ -834,7 +855,7 @@ mod tests {
         services::media_tools,
     };
 
-    use super::{partial_output_path, publish_output, verify_output};
+    use super::{partial_output_path, publish_output, verify_output, ExportRegistry};
 
     #[test]
     fn publishing_without_overwrite_never_replaces_an_existing_file() {
@@ -850,6 +871,23 @@ mod tests {
         assert!(partial.is_file());
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn shutdown_cancellation_marks_the_active_job_only() {
+        let registry = ExportRegistry::default();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        registry
+            .reserve("job-1".to_owned(), cancelled.clone())
+            .unwrap();
+
+        registry.cancel_active();
+
+        assert!(cancelled.load(Ordering::SeqCst));
+        registry.finish("stale-job");
+        assert!(registry.is_active());
+        registry.finish("job-1");
+        assert!(!registry.is_active());
     }
 
     #[test]

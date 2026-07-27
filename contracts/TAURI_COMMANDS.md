@@ -14,6 +14,7 @@
 select_media_file(): string | null
 select_overlay_file(): string | null
 select_export_destination({ suggestedName: string }): string | null
+select_diagnostic_destination({ suggestedName: string }): string | null
 select_project_file(): string | null
 select_projects_folder(): string | null
 ```

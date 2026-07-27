@@ -11,6 +11,7 @@ use crate::domain::AppError;
 pub struct PathPolicy {
     approved_paths: Mutex<HashSet<PathBuf>>,
     approved_outputs: Mutex<HashSet<PathBuf>>,
+    approved_diagnostics: Mutex<HashSet<PathBuf>>,
 }
 
 impl PathPolicy {
@@ -88,6 +89,67 @@ impl PathPolicy {
             ))
         }
     }
+
+    pub fn authorize_diagnostic_file(&self, path: &Path) -> Result<PathBuf, AppError> {
+        let normalized = normalize_diagnostic_file(path)?;
+        let mut approved = self
+            .approved_diagnostics
+            .lock()
+            .map_err(|_| AppError::internal("Path authorization state is unavailable."))?;
+        approved.insert(normalized.clone());
+        Ok(normalized)
+    }
+
+    pub fn require_diagnostic_file(&self, path: &Path) -> Result<PathBuf, AppError> {
+        let normalized = normalize_diagnostic_file(path)?;
+        let approved = self
+            .approved_diagnostics
+            .lock()
+            .map_err(|_| AppError::internal("Path authorization state is unavailable."))?;
+        if approved.contains(&normalized) {
+            Ok(normalized)
+        } else {
+            Err(AppError::destination_denied(
+                "Choose the diagnostic destination before creating the bundle.",
+            ))
+        }
+    }
+
+    pub fn require_reveal_file(&self, path: &Path) -> Result<PathBuf, AppError> {
+        let canonical = canonical_file(path)?;
+        if self
+            .approved_paths
+            .lock()
+            .map_err(|_| AppError::internal("Path authorization state is unavailable."))?
+            .contains(&canonical)
+        {
+            return Ok(canonical);
+        }
+        let normalized = canonical
+            .parent()
+            .and_then(|parent| fs::canonicalize(parent).ok())
+            .and_then(|parent| canonical.file_name().map(|name| parent.join(name)))
+            .ok_or_else(|| {
+                AppError::destination_denied("The reveal path could not be normalized.")
+            })?;
+        let output_approved = self
+            .approved_outputs
+            .lock()
+            .map_err(|_| AppError::internal("Path authorization state is unavailable."))?
+            .contains(&normalized);
+        let diagnostic_approved = self
+            .approved_diagnostics
+            .lock()
+            .map_err(|_| AppError::internal("Path authorization state is unavailable."))?
+            .contains(&normalized);
+        if output_approved || diagnostic_approved {
+            Ok(canonical)
+        } else {
+            Err(AppError::destination_denied(
+                "Only a selected project, export, or diagnostic file can be revealed.",
+            ))
+        }
+    }
 }
 
 fn canonical_file(path: &Path) -> Result<PathBuf, AppError> {
@@ -125,17 +187,31 @@ fn canonical_directory(path: &Path) -> Result<PathBuf, AppError> {
 }
 
 fn normalize_output_file(path: &Path) -> Result<PathBuf, AppError> {
+    normalize_new_file(path, "mp4", "Export filenames must use the .mp4 extension.")
+}
+
+fn normalize_diagnostic_file(path: &Path) -> Result<PathBuf, AppError> {
+    normalize_new_file(
+        path,
+        "zip",
+        "Diagnostic filenames must use the .zip extension.",
+    )
+}
+
+fn normalize_new_file(
+    path: &Path,
+    expected_extension: &str,
+    extension_error: &'static str,
+) -> Result<PathBuf, AppError> {
     let filename = path.file_name().ok_or_else(|| {
         AppError::destination_denied("Choose a filename inside a writable local folder.")
     })?;
-    let extension_is_mp4 = path
+    let extension_matches = path
         .extension()
         .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("mp4"));
-    if !extension_is_mp4 {
-        return Err(AppError::invalid_argument(
-            "Export filenames must use the .mp4 extension.",
-        ));
+        .is_some_and(|extension| extension.eq_ignore_ascii_case(expected_extension));
+    if !extension_matches {
+        return Err(AppError::invalid_argument(extension_error));
     }
     let parent = path
         .parent()
@@ -184,9 +260,22 @@ mod tests {
 
         let policy = PathPolicy::default();
         assert!(policy.require_output_file(&path).is_err());
+        fs::write(directory.join("unapproved.mp4"), b"unapproved").unwrap();
+        assert!(policy
+            .require_reveal_file(&directory.join("unapproved.mp4"))
+            .is_err());
         assert!(policy.authorize_output_file(&invalid).is_err());
         let authorized = policy.authorize_output_file(&path).unwrap();
         assert_eq!(policy.require_output_file(&path).unwrap(), authorized);
+        fs::write(&path, b"verified").unwrap();
+        assert_eq!(policy.require_reveal_file(&path).unwrap(), authorized);
+        let diagnostics = directory.join("diagnostic.zip");
+        assert!(policy.require_diagnostic_file(&diagnostics).is_err());
+        let authorized_diagnostics = policy.authorize_diagnostic_file(&diagnostics).unwrap();
+        assert_eq!(
+            policy.require_diagnostic_file(&diagnostics).unwrap(),
+            authorized_diagnostics
+        );
 
         fs::remove_dir_all(directory).unwrap();
     }

@@ -36,6 +36,7 @@
   } from "./services/overlay-model";
   import {
     cancelExport,
+    createDiagnosticBundle,
     createProject,
     getRuntimeInfo,
     importOverlayAsset,
@@ -47,8 +48,10 @@
     normalizeAppError,
     relinkSource,
     removeRecentProject,
+    revealInFolder,
     saveProject,
     selectExportDestination,
+    selectDiagnosticDestination,
     selectMediaFile,
     selectOverlayFile,
     selectProjectFile,
@@ -88,6 +91,9 @@
   let exportDestination = $state("");
   let exportOverwriteConfirmed = $state(false);
   let exportState = $state<ExportState>(createExportState());
+  let diagnosticBusy = $state(false);
+  let diagnosticPath = $state<string | null>(null);
+  let diagnosticError = $state<string | null>(null);
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
@@ -250,6 +256,9 @@
     exportDestination = "";
     exportOverwriteConfirmed = false;
     exportState = createExportState();
+    diagnosticBusy = false;
+    diagnosticPath = null;
+    diagnosticError = null;
     autosave = createAutosaveScheduler(persistProject);
   }
 
@@ -297,6 +306,8 @@
         exportDestination = destination;
         exportOverwriteConfirmed = false;
         exportState = createExportState();
+        diagnosticPath = null;
+        diagnosticError = null;
       }
     } catch (error) {
       exportState = {
@@ -393,6 +404,49 @@
         error: normalizeAppError(error),
         cancelRequested: false,
       };
+    }
+  }
+
+  async function createExportDiagnostic(): Promise<void> {
+    if (!session || diagnosticBusy) {
+      return;
+    }
+    diagnosticBusy = true;
+    diagnosticError = null;
+    try {
+      const destination = await selectDiagnosticDestination(
+        `${session.project.name}-diagnostics.zip`,
+      );
+      if (!destination) {
+        return;
+      }
+      const result = await createDiagnosticBundle(
+        destination,
+        session.projectPath,
+      );
+      diagnosticPath = result.path;
+    } catch (error) {
+      const normalized = normalizeAppError(error);
+      diagnosticError = normalized.safeDetail
+        ? `${normalized.message} ${normalized.safeDetail}`
+        : normalized.message;
+    } finally {
+      diagnosticBusy = false;
+    }
+  }
+
+  async function revealExportOutput(): Promise<void> {
+    if (!exportState.outputPath) {
+      return;
+    }
+    diagnosticError = null;
+    try {
+      await revealInFolder(exportState.outputPath);
+    } catch (error) {
+      const normalized = normalizeAppError(error);
+      diagnosticError = normalized.safeDetail
+        ? `${normalized.message} ${normalized.safeDetail}`
+        : normalized.message;
     }
   }
 
@@ -1140,11 +1194,16 @@
         destinationPath={exportDestination}
         overwriteConfirmed={exportOverwriteConfirmed}
         state={exportState}
+        {diagnosticBusy}
+        {diagnosticPath}
+        {diagnosticError}
         onSettingsChange={updateExportSettings}
         onChooseDestination={chooseExportDestination}
         onOverwriteChange={(confirmed) => (exportOverwriteConfirmed = confirmed)}
         onStart={startCurrentExport}
         onCancel={cancelCurrentExport}
+        onCreateDiagnostic={createExportDiagnostic}
+        onReveal={revealExportOutput}
         onClose={closeExport}
       />
     {/if}

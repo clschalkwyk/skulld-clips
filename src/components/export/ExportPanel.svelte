@@ -12,11 +12,16 @@
     destinationPath: string;
     overwriteConfirmed: boolean;
     state: ExportState;
+    diagnosticBusy: boolean;
+    diagnosticPath: string | null;
+    diagnosticError: string | null;
     onSettingsChange: (settings: ExportSettings) => void;
     onChooseDestination: () => void;
     onOverwriteChange: (confirmed: boolean) => void;
     onStart: () => void;
     onCancel: () => void;
+    onCreateDiagnostic: () => void;
+    onReveal: () => void;
     onClose: () => void;
   }
 
@@ -27,11 +32,16 @@
     destinationPath,
     overwriteConfirmed,
     state,
+    diagnosticBusy,
+    diagnosticPath,
+    diagnosticError,
     onSettingsChange,
     onChooseDestination,
     onOverwriteChange,
     onStart,
     onCancel,
+    onCreateDiagnostic,
+    onReveal,
     onClose,
   }: Props = $props();
 
@@ -279,6 +289,15 @@
       </div>
     {/if}
 
+    {#if diagnosticPath}
+      <div class="diagnostic-result" role="status">
+        Diagnostic ZIP created: {filename(diagnosticPath)}
+      </div>
+    {/if}
+    {#if diagnosticError}
+      <div class="export-errors" role="alert">{diagnosticError}</div>
+    {/if}
+
     <footer class="export-actions">
       {#if active}
         <button
@@ -290,8 +309,23 @@
           {state.cancelRequested ? "Cancelling…" : "Cancel export"}
         </button>
       {:else if state.status === "completed" || state.status === "cancelled"}
+        {#if state.status === "completed"}
+          <button class="secondary-button" type="button" onclick={onReveal}>
+            Reveal output
+          </button>
+        {/if}
         <button class="primary-button" type="button" onclick={onClose}>Done</button>
       {:else}
+        {#if state.status === "error"}
+          <button
+            class="secondary-button"
+            type="button"
+            onclick={onCreateDiagnostic}
+            disabled={diagnosticBusy}
+          >
+            {diagnosticBusy ? "Creating ZIP…" : "Create diagnostic ZIP"}
+          </button>
+        {/if}
         <button class="text-button" type="button" onclick={onClose}>Not now</button>
         <button
           class="primary-button"

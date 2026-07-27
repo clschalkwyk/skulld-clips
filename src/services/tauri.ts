@@ -27,6 +27,15 @@ export interface CancelExportResponse {
   accepted: boolean;
 }
 
+export interface DiagnosticBundleResponse {
+  path: string;
+  sizeBytes: number;
+}
+
+export interface RevealResponse {
+  opened: boolean;
+}
+
 export type InvokeFn = <T>(
   command: string,
   args?: Record<string, unknown>,
@@ -240,6 +249,36 @@ export function cancelExport(
   invokeCommand: InvokeFn = invoke,
 ): Promise<CancelExportResponse> {
   return invokeNative("cancel_export", { jobId }, invokeCommand);
+}
+
+export function selectDiagnosticDestination(
+  suggestedName: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<string | null> {
+  return invokeNative(
+    "select_diagnostic_destination",
+    { suggestedName },
+    invokeCommand,
+  );
+}
+
+export function createDiagnosticBundle(
+  destinationZipPath: string,
+  projectPath?: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<DiagnosticBundleResponse> {
+  return invokeNative(
+    "create_diagnostic_bundle",
+    { destinationZipPath, projectPath: projectPath ?? null },
+    invokeCommand,
+  );
+}
+
+export function revealInFolder(
+  path: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<RevealResponse> {
+  return invokeNative("reveal_in_folder", { path }, invokeCommand);
 }
 
 export async function listenForExportEvents(

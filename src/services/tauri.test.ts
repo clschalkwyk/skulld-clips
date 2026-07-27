@@ -3,14 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { RuntimeInfo } from "../contracts/runtime";
 import {
   cancelExport,
+  createDiagnosticBundle,
   createProject,
   getRuntimeInfo,
   importOverlayAsset,
   loadProject,
   normalizeAppError,
   projectAssetPath,
+  revealInFolder,
   saveProject,
   selectExportDestination,
+  selectDiagnosticDestination,
   startExport,
   validateExport,
   writeCaptionAsset,
@@ -131,6 +134,13 @@ describe("project commands", () => {
     await validateExport(request, invokeCommand);
     await startExport(request, invokeCommand);
     await cancelExport("job-1", invokeCommand);
+    await selectDiagnosticDestination("support.zip", invokeCommand);
+    await createDiagnosticBundle(
+      "/exports/support.zip",
+      "/projects/id/project.skcf.json",
+      invokeCommand,
+    );
+    await revealInFolder("/exports/clip.mp4", invokeCommand);
 
     expect(invokeCommand).toHaveBeenNthCalledWith(
       1,
@@ -145,6 +155,22 @@ describe("project commands", () => {
     });
     expect(invokeCommand).toHaveBeenNthCalledWith(4, "cancel_export", {
       jobId: "job-1",
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      5,
+      "select_diagnostic_destination",
+      { suggestedName: "support.zip" },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      6,
+      "create_diagnostic_bundle",
+      {
+        destinationZipPath: "/exports/support.zip",
+        projectPath: "/projects/id/project.skcf.json",
+      },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(7, "reveal_in_folder", {
+      path: "/exports/clip.mp4",
     });
   });
 });

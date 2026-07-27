@@ -1381,6 +1381,15 @@ kbd {
   font-size: 11px;
 }
 
+.diagnostic-result {
+  margin: 0 0 18px;
+  border-left: 3px solid #72d6a0;
+  padding: 11px 14px;
+  color: #a9e9c5;
+  background: rgb(114 214 160 / 7%);
+  font-size: 11px;
+}
+
 .export-actions {
   justify-content: flex-end;
   padding-top: 18px;

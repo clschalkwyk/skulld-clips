@@ -25,6 +25,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 uuid = { version = "1", features = ["serde", "v4"] }
 wait-timeout = "0.2"
+zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

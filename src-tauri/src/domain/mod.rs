@@ -4,7 +4,7 @@ mod media;
 mod project;
 mod runtime;
 
-pub use error::AppError;
+pub use error::{AppError, AppErrorCode};
 pub use export::{
     CancelExportResponse, ExportCancelledEvent, ExportCompletedEvent, ExportFailedEvent,
     ExportProgressEvent, ExportRequest, ExportValidation, StartExportResponse,
