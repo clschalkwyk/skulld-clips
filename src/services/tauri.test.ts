@@ -4,9 +4,12 @@ import type { RuntimeInfo } from "../contracts/runtime";
 import {
   createProject,
   getRuntimeInfo,
+  importOverlayAsset,
   loadProject,
   normalizeAppError,
+  projectAssetPath,
   saveProject,
+  writeCaptionAsset,
   type InvokeFn,
 } from "./tauri";
 import type { ProjectV1 } from "../../contracts/types";
@@ -76,5 +79,41 @@ describe("project commands", () => {
       projectPath: "/projects/id/project.skcf.json",
       project,
     });
+  });
+
+  it("uses typed asset payloads and derives cross-platform preview paths", async () => {
+    const invokeCommand = vi.fn(async () => ({})) as InvokeFn;
+
+    await importOverlayAsset(
+      "/projects/id/project.skcf.json",
+      "/art/logo.png",
+      invokeCommand,
+    );
+    await writeCaptionAsset(
+      "/projects/id/project.skcf.json",
+      "a".repeat(64),
+      "cG5n",
+      400,
+      120,
+      invokeCommand,
+    );
+
+    expect(invokeCommand).toHaveBeenNthCalledWith(1, "import_overlay_asset", {
+      projectPath: "/projects/id/project.skcf.json",
+      sourceAssetPath: "/art/logo.png",
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(2, "write_caption_asset", {
+      projectPath: "/projects/id/project.skcf.json",
+      contentHash: "a".repeat(64),
+      pngBytesBase64: "cG5n",
+      width: 400,
+      height: 120,
+    });
+    expect(
+      projectAssetPath(
+        "C:\\Projects\\id\\project.skcf.json",
+        "assets/captions/hash.png",
+      ),
+    ).toBe("C:\\Projects\\id\\assets\\captions\\hash.png");
   });
 });

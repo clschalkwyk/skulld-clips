@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Overlay } from "../../../contracts/types";
   import {
     formatTimelineTime,
     setTrimIn,
@@ -11,6 +12,7 @@
     outMs: number;
     playheadMs: number;
     playing: boolean;
+    overlays?: Overlay[];
     disabled?: boolean;
     onInChange: (milliseconds: number) => void;
     onOutChange: (milliseconds: number) => void;
@@ -24,6 +26,7 @@
     outMs,
     playheadMs,
     playing,
+    overlays = [],
     disabled = false,
     onInChange,
     onOutChange,
@@ -37,6 +40,10 @@
 
   function inputNumber(event: Event): number {
     return Number((event.currentTarget as HTMLInputElement).value);
+  }
+
+  function overlayBarStyle(overlay: Overlay): string {
+    return `left:${(overlay.startMs / durationMs) * 100}%;width:${((overlay.endMs - overlay.startMs) / durationMs) * 100}%`;
   }
 </script>
 
@@ -65,6 +72,14 @@
 
   <div class="timeline-track">
     <div class="selection-range" style={selectionStyle}></div>
+    <div class="overlay-bars" aria-label="Overlay visibility ranges">
+      {#each overlays as overlay (overlay.id)}
+        <span
+          style={overlayBarStyle(overlay)}
+          title={`${overlay.name} visibility`}
+        ></span>
+      {/each}
+    </div>
     <input
       class="playhead-range"
       type="range"

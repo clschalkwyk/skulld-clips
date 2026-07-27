@@ -94,6 +94,15 @@ impl AppError {
         }
     }
 
+    pub fn asset_missing(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::AssetMissing,
+            message: "A required project asset is missing or invalid.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
     pub fn io(message: impl Into<String>, safe_detail: impl Into<String>) -> Self {
         Self {
             code: AppErrorCode::Io,

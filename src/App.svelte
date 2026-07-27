@@ -3,18 +3,32 @@
 
   import type {
     AppError,
+    CaptionStyle,
     LoadProjectResult,
     NormalizedRect,
+    Overlay,
     RecentProject,
   } from "../contracts/types";
   import CropInspector from "./components/editor/CropInspector.svelte";
+  import LayerPanel from "./components/editor/LayerPanel.svelte";
+  import OverlayInspector from "./components/editor/OverlayInspector.svelte";
   import PreviewStage from "./components/editor/PreviewStage.svelte";
   import Timeline from "./components/editor/Timeline.svelte";
   import type { RuntimeInfo } from "./contracts/runtime";
   import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
+  import { renderCaption } from "./services/caption-renderer";
+  import {
+    createCaptionOverlay,
+    createImageOverlay,
+    DEFAULT_CAPTION_STYLE,
+    nextZIndex,
+    reorderOverlay,
+    replaceOverlayAsset,
+  } from "./services/overlay-model";
   import {
     createProject,
     getRuntimeInfo,
+    importOverlayAsset,
     listRecentProjects,
     listenForFileDrops,
     loadProject,
@@ -24,7 +38,9 @@
     removeRecentProject,
     saveProject,
     selectMediaFile,
+    selectOverlayFile,
     selectProjectFile,
+    writeCaptionAsset,
   } from "./services/tauri";
   import {
     approximateFrameStepMs,
@@ -36,6 +52,7 @@
 
   type BusyAction = "importing" | "opening" | "relinking" | null;
   type SaveState = "saved" | "unsaved" | "saving" | "error";
+  type CaptionStatus = "idle" | "rendering" | "error";
 
   let runtime = $state<RuntimeInfo | null>(null);
   let runtimeError = $state<AppError | null>(null);
@@ -50,9 +67,17 @@
   let playheadMs = $state(0);
   let playing = $state(false);
   let previewError = $state<string | null>(null);
+  let selectedOverlayId = $state<string | null>(null);
+  let overlayBusy = $state(false);
+  let captionStatus = $state<CaptionStatus>("idle");
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
+  let captionRenderTimer: ReturnType<typeof setTimeout> | null = null;
+  let captionRenderPromise: Promise<void> | null = null;
+  let captionRenderError: AppError | null = null;
+  let pendingCaptionId: string | null = null;
+  let captionRevision = 0;
 
   const sourceStatusLabel = $derived(
     session?.sourceStatus === "missing"
@@ -70,12 +95,18 @@
       ? mediaPreviewUrl(session.project.source.path)
       : null,
   );
+  const selectedOverlay = $derived(
+    session?.project.overlays.find(({ id }) => id === selectedOverlayId) ?? null,
+  );
 
   onMount(() => {
     void bootstrap();
     return () => {
       unlistenDrop?.();
       autosave?.dispose();
+      if (captionRenderTimer) {
+        clearTimeout(captionRenderTimer);
+      }
     };
   });
 
@@ -179,11 +210,16 @@
 
   function openSession(next: LoadProjectResult): void {
     autosave?.dispose();
+    cancelPendingCaptionRender();
     session = next;
     pendingReplacementPath = null;
     playheadMs = next.project.timeline.inMs;
     playing = false;
     previewError = null;
+    selectedOverlayId = null;
+    overlayBusy = false;
+    captionStatus = "idle";
+    captionRenderError = null;
     saveState = "saved";
     autosave = createAutosaveScheduler(persistProject);
   }
@@ -209,6 +245,284 @@
     markProjectDirty();
   }
 
+  function updateOverlay(overlay: Overlay): void {
+    if (!session || session.sourceStatus !== "ok") {
+      return;
+    }
+    const index = session.project.overlays.findIndex(({ id }) => id === overlay.id);
+    if (index < 0) {
+      return;
+    }
+    session.project.overlays[index] = overlay;
+    markProjectDirty();
+  }
+
+  async function addImageOverlay(): Promise<void> {
+    if (!session || session.sourceStatus !== "ok" || overlayBusy) {
+      return;
+    }
+    if (session.project.overlays.length >= 100) {
+      actionError = overlayLimitError();
+      return;
+    }
+    actionError = null;
+    try {
+      const sourceAssetPath = await selectOverlayFile();
+      if (!sourceAssetPath || !session) {
+        return;
+      }
+      overlayBusy = true;
+      const asset = await importOverlayAsset(session.projectPath, sourceAssetPath);
+      const overlay = createImageOverlay(
+        crypto.randomUUID(),
+        asset,
+        session.project.timeline.inMs,
+        session.project.timeline.outMs,
+        nextZIndex(session.project.overlays),
+      );
+      session.project.overlays.push(overlay);
+      selectOverlay(overlay.id);
+      markProjectDirty();
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    } finally {
+      overlayBusy = false;
+    }
+  }
+
+  async function addCaptionOverlay(text: string): Promise<boolean> {
+    if (!session || session.sourceStatus !== "ok" || overlayBusy) {
+      return false;
+    }
+    if (session.project.overlays.length >= 100) {
+      actionError = overlayLimitError();
+      return false;
+    }
+    overlayBusy = true;
+    captionStatus = "rendering";
+    actionError = null;
+    try {
+      const caption = { ...DEFAULT_CAPTION_STYLE, text: text.trim() };
+      const rendered = await renderCaption(caption);
+      if (!session) {
+        return false;
+      }
+      const asset = await writeCaptionAsset(
+        session.projectPath,
+        rendered.contentHash,
+        rendered.pngBytesBase64,
+        rendered.width,
+        rendered.height,
+      );
+      const overlay = createCaptionOverlay(
+        crypto.randomUUID(),
+        caption.text,
+        caption,
+        asset,
+        session.project.timeline.inMs,
+        session.project.timeline.outMs,
+        nextZIndex(session.project.overlays),
+      );
+      session.project.overlays.push(overlay);
+      selectOverlay(overlay.id);
+      captionStatus = "idle";
+      markProjectDirty();
+      return true;
+    } catch (error) {
+      captionStatus = "error";
+      actionError = normalizeCaptionRenderError(error);
+      return false;
+    } finally {
+      overlayBusy = false;
+    }
+  }
+
+  async function replaceImageOverlay(id: string): Promise<void> {
+    if (!session || session.sourceStatus !== "ok" || overlayBusy) {
+      return;
+    }
+    actionError = null;
+    try {
+      const sourceAssetPath = await selectOverlayFile();
+      if (!sourceAssetPath || !session) {
+        return;
+      }
+      overlayBusy = true;
+      const asset = await importOverlayAsset(session.projectPath, sourceAssetPath);
+      const overlay = session.project.overlays.find(({ id: candidate }) => candidate === id);
+      if (!overlay || overlay.type !== "image") {
+        return;
+      }
+      updateOverlay(replaceOverlayAsset(overlay, asset));
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    } finally {
+      overlayBusy = false;
+    }
+  }
+
+  function deleteOverlay(id: string): void {
+    if (!session) {
+      return;
+    }
+    session.project.overlays = session.project.overlays.filter(
+      ({ id: candidate }) => candidate !== id,
+    );
+    if (pendingCaptionId === id) {
+      cancelPendingCaptionRender();
+    }
+    if (selectedOverlayId === id) {
+      selectOverlay(null);
+    }
+    markProjectDirty();
+  }
+
+  function selectOverlay(id: string | null): void {
+    selectedOverlayId = id;
+    const overlay = session?.project.overlays.find(
+      ({ id: candidate }) => candidate === id,
+    );
+    if (!overlay || overlay.type === "image") {
+      captionStatus = "idle";
+    }
+  }
+
+  function moveOverlayInStack(id: string, direction: -1 | 1): void {
+    if (!session) {
+      return;
+    }
+    session.project.overlays = reorderOverlay(
+      session.project.overlays,
+      id,
+      direction,
+    );
+    markProjectDirty();
+  }
+
+  function updateCaptionOverlay(id: string, caption: CaptionStyle): void {
+    if (!session) {
+      return;
+    }
+    const overlay = session.project.overlays.find(
+      ({ id: candidate }) => candidate === id,
+    );
+    if (!overlay || overlay.type !== "caption") {
+      return;
+    }
+    overlay.caption = caption;
+    captionRevision += 1;
+    captionRenderError = null;
+    captionStatus = "rendering";
+    if (captionRenderTimer) {
+      clearTimeout(captionRenderTimer);
+    }
+    const revision = captionRevision;
+    pendingCaptionId = id;
+    captionRenderTimer = setTimeout(() => {
+      captionRenderTimer = null;
+      pendingCaptionId = null;
+      startCaptionRender(id, revision);
+    }, 250);
+    markProjectDirty();
+  }
+
+  function startCaptionRender(id: string, revision: number): Promise<void> {
+    const promise = renderCaptionRevision(id, revision);
+    captionRenderPromise = promise;
+    void promise.then(() => {
+      if (captionRenderPromise === promise) {
+        captionRenderPromise = null;
+      }
+    });
+    return promise;
+  }
+
+  async function renderCaptionRevision(
+    id: string,
+    revision: number,
+  ): Promise<void> {
+    const active = session;
+    const overlay = active?.project.overlays.find(
+      ({ id: candidate }) => candidate === id,
+    );
+    if (!active || !overlay || overlay.type !== "caption") {
+      return;
+    }
+    const caption = { ...overlay.caption };
+    try {
+      const rendered = await renderCaption(caption);
+      const asset = await writeCaptionAsset(
+        active.projectPath,
+        rendered.contentHash,
+        rendered.pngBytesBase64,
+        rendered.width,
+        rendered.height,
+      );
+      if (
+        session?.projectPath !== active.projectPath ||
+        revision !== captionRevision
+      ) {
+        return;
+      }
+      const current = session.project.overlays.find(
+        ({ id: candidate }) => candidate === id,
+      );
+      if (!current || current.type !== "caption") {
+        return;
+      }
+      const updated = replaceOverlayAsset(current, asset);
+      current.generatedAsset = asset;
+      current.position = updated.position;
+      captionStatus = "idle";
+      captionRenderError = null;
+    } catch (error) {
+      if (revision === captionRevision) {
+        captionRenderError = normalizeCaptionRenderError(error);
+        captionStatus = "error";
+        actionError = captionRenderError;
+      }
+    }
+  }
+
+  async function flushPendingCaptionRender(): Promise<void> {
+    if (captionRenderTimer && pendingCaptionId) {
+      const id = pendingCaptionId;
+      clearTimeout(captionRenderTimer);
+      captionRenderTimer = null;
+      pendingCaptionId = null;
+      await startCaptionRender(id, captionRevision);
+    } else if (captionRenderPromise) {
+      await captionRenderPromise;
+    }
+    if (captionRenderError) {
+      throw captionRenderError;
+    }
+  }
+
+  function cancelPendingCaptionRender(): void {
+    if (captionRenderTimer) {
+      clearTimeout(captionRenderTimer);
+      captionRenderTimer = null;
+    }
+    pendingCaptionId = null;
+    captionRevision += 1;
+    captionRenderPromise = null;
+    captionRenderError = null;
+  }
+
+  function clampOverlayTimings(): void {
+    if (!session) {
+      return;
+    }
+    const { inMs, outMs } = session.project.timeline;
+    for (const overlay of session.project.overlays) {
+      const start = Math.max(inMs, Math.min(overlay.startMs, outMs - 1));
+      const end = Math.min(outMs, Math.max(overlay.endMs, start + 1));
+      overlay.startMs = start;
+      overlay.endMs = end;
+    }
+  }
+
   function updateTrimIn(requestedMs: number): void {
     if (!session) {
       return;
@@ -219,6 +533,7 @@
       timeline.outMs,
       session.project.source.probe.durationMs,
     );
+    clampOverlayTimings();
     playheadMs = clampPlayhead(playheadMs, timeline.inMs, timeline.outMs);
     markProjectDirty();
   }
@@ -233,6 +548,7 @@
       timeline.inMs,
       session.project.source.probe.durationMs,
     );
+    clampOverlayTimings();
     playheadMs = clampPlayhead(playheadMs, timeline.inMs, timeline.outMs);
     markProjectDirty();
   }
@@ -267,6 +583,7 @@
     saveState = "saving";
     actionError = null;
     try {
+      await flushPendingCaptionRender();
       const saved = await saveProject(active.projectPath, active.project);
       if (session?.projectPath === active.projectPath) {
         session.project.updatedAt = saved.savedAt;
@@ -283,8 +600,12 @@
   async function backToHome(): Promise<void> {
     playing = false;
     await autosave?.flush();
+    if (saveState === "error") {
+      return;
+    }
     autosave?.dispose();
     autosave = null;
+    cancelPendingCaptionRender();
     session = null;
     pendingReplacementPath = null;
     await refreshRecents();
@@ -366,6 +687,27 @@
         });
   }
 
+  function normalizeCaptionRenderError(error: unknown): AppError {
+    if (error instanceof Error) {
+      return {
+        code: "E_INVALID_ARGUMENT",
+        message: "The caption could not be rendered.",
+        safeDetail: error.message,
+        retryable: false,
+      };
+    }
+    return normalizeAppError(error);
+  }
+
+  function overlayLimitError(): AppError {
+    return {
+      code: "E_INVALID_ARGUMENT",
+      message: "The project overlay limit has been reached.",
+      safeDetail: "Delete an existing overlay before adding another.",
+      retryable: false,
+    };
+  }
+
   function handleShortcut(event: KeyboardEvent): void {
     if (!session || (isTypingTarget(event.target) && event.key !== "Escape")) {
       return;
@@ -409,6 +751,16 @@
       case "End":
         event.preventDefault();
         updatePlayhead(timeline.outMs);
+        break;
+      case "Delete":
+      case "Backspace":
+        if (selectedOverlayId) {
+          event.preventDefault();
+          deleteOverlay(selectedOverlayId);
+        }
+        break;
+      case "Escape":
+        selectOverlay(null);
         break;
     }
   }
@@ -483,13 +835,15 @@
 
     <section class="editor-grid">
       <aside class="panel layers-panel">
-        <p class="section-label">Project</p>
-        <h2>Layers</h2>
-        <div class="empty-panel">
-          <strong>Source video</strong>
-          <span>{session.project.source.filename}</span>
-          <small>Overlays become available in M3.</small>
-        </div>
+        <LayerPanel
+          overlays={session.project.overlays}
+          sourceFilename={session.project.source.filename}
+          {selectedOverlayId}
+          busy={overlayBusy || session.sourceStatus !== "ok"}
+          onSelect={selectOverlay}
+          onAddImage={addImageOverlay}
+          onAddCaption={addCaptionOverlay}
+        />
       </aside>
 
       <section class="preview-panel" aria-labelledby="preview-heading">
@@ -500,10 +854,15 @@
           sourceStatus={session.sourceStatus}
           {sourceSize}
           crop={session.project.crop}
+          overlays={session.project.overlays}
+          projectPath={session.projectPath}
+          {selectedOverlayId}
           {playheadMs}
           {playing}
           outMs={session.project.timeline.outMs}
           onCropChange={updateCrop}
+          onOverlayChange={updateOverlay}
+          onOverlaySelect={selectOverlay}
           onPlayheadChange={updatePlayhead}
           onPlayingChange={updatePlaying}
           onPreviewError={(message) => (previewError = message)}
@@ -519,12 +878,27 @@
       </section>
 
       <aside class="panel inspector-panel">
-        <CropInspector
-          crop={session.project.crop}
-          {sourceSize}
-          disabled={session.sourceStatus !== "ok"}
-          onChange={updateCrop}
-        />
+        {#if selectedOverlay}
+          <OverlayInspector
+            overlay={selectedOverlay}
+            timelineInMs={session.project.timeline.inMs}
+            timelineOutMs={session.project.timeline.outMs}
+            {captionStatus}
+            disabled={overlayBusy || session.sourceStatus !== "ok"}
+            onChange={updateOverlay}
+            onCaptionChange={updateCaptionOverlay}
+            onReplaceImage={replaceImageOverlay}
+            onReorder={moveOverlayInStack}
+            onDelete={deleteOverlay}
+          />
+        {:else}
+          <CropInspector
+            crop={session.project.crop}
+            {sourceSize}
+            disabled={session.sourceStatus !== "ok"}
+            onChange={updateCrop}
+          />
+        {/if}
         <dl class="detail-list">
           <div><dt>Codec</dt><dd>{session.project.source.probe.video.codec}</dd></div>
           <div><dt>Container</dt><dd>{session.project.source.probe.containerName}</dd></div>
@@ -551,6 +925,7 @@
       outMs={session.project.timeline.outMs}
       {playheadMs}
       {playing}
+      overlays={session.project.overlays}
       disabled={session.sourceStatus !== "ok"}
       onInChange={updateTrimIn}
       onOutChange={updateTrimOut}
@@ -559,7 +934,7 @@
     />
 
     <footer class="editor-footer">
-      <span>Milestone 2 · Preview, trim, locked crop</span>
+      <span>Milestone 3 · Preview, crop, overlays, captions</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
   </main>

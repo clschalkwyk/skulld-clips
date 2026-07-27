@@ -5,6 +5,7 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { AppError, RuntimeInfo } from "../contracts/runtime";
 import type {
   AppErrorCode,
+  AssetRef,
   CreateProjectResult,
   LoadProjectResult,
   MediaProbe,
@@ -104,6 +105,12 @@ export function selectProjectFile(
   return invokeNative("select_project_file", undefined, invokeCommand);
 }
 
+export function selectOverlayFile(
+  invokeCommand: InvokeFn = invoke,
+): Promise<string | null> {
+  return invokeNative("select_overlay_file", undefined, invokeCommand);
+}
+
 export function probeMedia(
   path: string,
   invokeCommand: InvokeFn = invoke,
@@ -164,6 +171,33 @@ export function removeRecentProject(
   return invokeNative("remove_recent_project", { projectPath }, invokeCommand);
 }
 
+export function importOverlayAsset(
+  projectPath: string,
+  sourceAssetPath: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<AssetRef> {
+  return invokeNative(
+    "import_overlay_asset",
+    { projectPath, sourceAssetPath },
+    invokeCommand,
+  );
+}
+
+export function writeCaptionAsset(
+  projectPath: string,
+  contentHash: string,
+  pngBytesBase64: string,
+  width: number,
+  height: number,
+  invokeCommand: InvokeFn = invoke,
+): Promise<AssetRef> {
+  return invokeNative(
+    "write_caption_asset",
+    { projectPath, contentHash, pngBytesBase64, width, height },
+    invokeCommand,
+  );
+}
+
 export function listenForFileDrops(
   onDrop: (paths: string[]) => void,
   onActiveChange: (active: boolean) => void,
@@ -188,4 +222,27 @@ export function listenForFileDrops(
 
 export function mediaPreviewUrl(path: string): string {
   return convertFileSrc(path);
+}
+
+export function projectAssetPath(
+  projectPath: string,
+  relativePath: string,
+): string {
+  const lastSeparator = Math.max(
+    projectPath.lastIndexOf("/"),
+    projectPath.lastIndexOf("\\"),
+  );
+  if (lastSeparator < 0) {
+    throw new Error("Project path does not contain a parent folder");
+  }
+  const separator = projectPath.includes("\\") ? "\\" : "/";
+  const relative = relativePath.replaceAll(/[\\/]/g, separator);
+  return `${projectPath.slice(0, lastSeparator)}${separator}${relative}`;
+}
+
+export function projectAssetPreviewUrl(
+  projectPath: string,
+  relativePath: string,
+): string {
+  return convertFileSrc(projectAssetPath(projectPath, relativePath));
 }

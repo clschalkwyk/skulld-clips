@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import type { NormalizedRect, SourceStatus } from "../../../contracts/types";
+  import type {
+    AssetRef,
+    NormalizedRect,
+    Overlay,
+    SourceStatus,
+  } from "../../../contracts/types";
   import {
     fitSourceInsideStage,
     normalizedRectToStage,
@@ -15,6 +20,13 @@
     resetCrop,
     zoomCrop,
   } from "../../services/crop-solver";
+  import {
+    isOverlayVisible,
+    moveOverlay,
+    overlayAsset,
+    resizeOverlay,
+  } from "../../services/overlay-model";
+  import { projectAssetPreviewUrl } from "../../services/tauri";
 
   interface Props {
     sourceUrl: string | null;
@@ -22,10 +34,15 @@
     sourceStatus: SourceStatus;
     sourceSize: Size;
     crop: NormalizedRect;
+    overlays: Overlay[];
+    projectPath: string;
+    selectedOverlayId: string | null;
     playheadMs: number;
     playing: boolean;
     outMs: number;
     onCropChange: (crop: NormalizedRect) => void;
+    onOverlayChange: (overlay: Overlay) => void;
+    onOverlaySelect: (id: string | null) => void;
     onPlayheadChange: (milliseconds: number) => void;
     onPlayingChange: (playing: boolean) => void;
     onPreviewError: (message: string | null) => void;
@@ -37,10 +54,15 @@
     sourceStatus,
     sourceSize,
     crop,
+    overlays,
+    projectPath,
+    selectedOverlayId,
     playheadMs,
     playing,
     outMs,
     onCropChange,
+    onOverlayChange,
+    onOverlaySelect,
     onPlayheadChange,
     onPlayingChange,
     onPreviewError,
@@ -57,9 +79,24 @@
         captureTarget: HTMLElement;
       }
     | null = null;
+  let overlayDrag:
+    | {
+        id: string;
+        mode: "pan" | "resize";
+        pointer: Point;
+        position: NormalizedRect;
+        asset: AssetRef;
+        captureTarget: HTMLElement;
+      }
+    | null = null;
 
   const cropPixels = $derived(
     normalizedRectToStage(crop, sourceSize, stageSize),
+  );
+  const visibleOverlays = $derived(
+    [...overlays]
+      .filter((overlay) => isOverlayVisible(overlay, playheadMs))
+      .sort((a, b) => a.zIndex - b.zIndex),
   );
 
   onMount(() => {
@@ -114,6 +151,7 @@
   function beginDrag(event: PointerEvent, mode: "pan" | "resize"): void {
     event.preventDefault();
     event.stopPropagation();
+    onOverlaySelect(null);
     const captureTarget = event.currentTarget as HTMLElement;
     captureTarget.setPointerCapture(event.pointerId);
     drag = {
@@ -122,6 +160,90 @@
       crop: { ...crop },
       captureTarget,
     };
+  }
+
+  function beginOverlayDrag(
+    event: PointerEvent,
+    overlay: Overlay,
+    mode: "pan" | "resize",
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const captureTarget = event.currentTarget as HTMLElement;
+    captureTarget.setPointerCapture(event.pointerId);
+    onOverlaySelect(overlay.id);
+    overlayDrag = {
+      id: overlay.id,
+      mode,
+      pointer: pointerPoint(event),
+      position: { ...overlay.position },
+      asset: overlayAsset(overlay),
+      captureTarget,
+    };
+  }
+
+  function continueOverlayDrag(event: PointerEvent): void {
+    if (!overlayDrag || cropPixels.width <= 0 || cropPixels.height <= 0) {
+      return;
+    }
+    const overlay = overlays.find(({ id }) => id === overlayDrag?.id);
+    if (!overlay) {
+      return;
+    }
+    const current = pointerPoint(event);
+    const dx = (current.x - overlayDrag.pointer.x) / cropPixels.width;
+    const dy = (current.y - overlayDrag.pointer.y) / cropPixels.height;
+    const position =
+      overlayDrag.mode === "pan"
+        ? moveOverlay(overlayDrag.position, dx, dy)
+        : resizeOverlay(
+            overlayDrag.position,
+            overlayDrag.asset,
+            overlayDrag.position.width + Math.max(dx, dy),
+          );
+    onOverlayChange({ ...overlay, position });
+  }
+
+  function endOverlayDrag(event: PointerEvent): void {
+    if (!overlayDrag) {
+      return;
+    }
+    if (overlayDrag.captureTarget.hasPointerCapture(event.pointerId)) {
+      overlayDrag.captureTarget.releasePointerCapture(event.pointerId);
+    }
+    overlayDrag = null;
+  }
+
+  function handleOverlayKey(event: KeyboardEvent, overlay: Overlay): void {
+    const multiplier = event.shiftKey ? 10 : 1;
+    const movements: Record<string, Point> = {
+      ArrowLeft: { x: -multiplier / 1080, y: 0 },
+      ArrowRight: { x: multiplier / 1080, y: 0 },
+      ArrowUp: { x: 0, y: -multiplier / 1920 },
+      ArrowDown: { x: 0, y: multiplier / 1920 },
+    };
+    const movement = movements[event.key];
+    if (!movement) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    onOverlayChange({
+      ...overlay,
+      position: moveOverlay(overlay.position, movement.x, movement.y),
+    });
+  }
+
+  function overlayStyle(overlay: Overlay): string {
+    const position = overlay.position;
+    return [
+      `left:${cropPixels.x + position.x * cropPixels.width}px`,
+      `top:${cropPixels.y + position.y * cropPixels.height}px`,
+      `width:${position.width * cropPixels.width}px`,
+      `height:${position.height * cropPixels.height}px`,
+      `opacity:${overlay.opacity}`,
+      `z-index:${20 + overlay.zIndex}`,
+    ].join(";");
   }
 
   function continueDrag(event: PointerEvent): void {
@@ -236,12 +358,44 @@
       onkeydown={handleCropKey}
     >
       <span class="crop-label">9:16 crop</span>
+      <span class="safe-area-guide" aria-hidden="true"></span>
       <span
         class="resize-handle"
         role="presentation"
         onpointerdown={(event) => beginDrag(event, "resize")}
       ></span>
     </button>
+    {#each visibleOverlays as overlay (overlay.id)}
+      <button
+        class:selected={selectedOverlayId === overlay.id}
+        class="overlay-frame"
+        type="button"
+        aria-label={`${overlay.name} ${overlay.type} overlay. Drag to move; arrows nudge.`}
+        style={overlayStyle(overlay)}
+        onpointerdown={(event) => beginOverlayDrag(event, overlay, "pan")}
+        onpointermove={continueOverlayDrag}
+        onpointerup={endOverlayDrag}
+        onpointercancel={endOverlayDrag}
+        onkeydown={(event) => handleOverlayKey(event, overlay)}
+        onclick={() => onOverlaySelect(overlay.id)}
+      >
+        <img
+          src={projectAssetPreviewUrl(
+            projectPath,
+            overlayAsset(overlay).relativePath,
+          )}
+          alt=""
+          draggable="false"
+          onerror={() =>
+            onPreviewError("A project overlay could not be displayed.")}
+        />
+        <span
+          class="overlay-resize-handle"
+          role="presentation"
+          onpointerdown={(event) => beginOverlayDrag(event, overlay, "resize")}
+        ></span>
+      </button>
+    {/each}
   {:else}
     <div class="preview-unavailable">
       <strong>Preview unavailable</strong>

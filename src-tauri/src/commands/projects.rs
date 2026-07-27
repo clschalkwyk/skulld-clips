@@ -209,6 +209,16 @@ pub async fn load_project(
             .allow_file(&response.project.source.path)
             .map_err(|_| AppError::internal("The media preview path could not be authorized."))?;
     }
+    for overlay in &response.project.overlays {
+        let (asset, _) = overlay.asset();
+        let asset_path = crate::services::assets::resolve_project_asset_path(
+            PathBuf::from(&response.project_path).as_path(),
+            &asset.relative_path,
+        )?;
+        app.asset_protocol_scope()
+            .allow_file(asset_path)
+            .map_err(|_| AppError::internal("A project asset preview could not be authorized."))?;
+    }
     record_recent(
         &app,
         &response.project_path,

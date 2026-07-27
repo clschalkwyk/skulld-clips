@@ -1,4 +1,7 @@
-use std::path::{Component, Path};
+use std::{
+    collections::HashSet,
+    path::{Component, Path},
+};
 
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
@@ -90,6 +93,23 @@ pub enum Overlay {
         #[serde(rename = "generatedAsset")]
         generated_asset: AssetRef,
     },
+}
+
+impl Overlay {
+    pub fn asset(&self) -> (&AssetRef, ProjectAssetKind) {
+        match self {
+            Self::Image { asset, .. } => (asset, ProjectAssetKind::Overlay),
+            Self::Caption {
+                generated_asset, ..
+            } => (generated_asset, ProjectAssetKind::Caption),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectAssetKind {
+    Overlay,
+    Caption,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -252,8 +272,17 @@ impl ProjectV1 {
                 "A project may contain at most 100 overlays.",
             ));
         }
+        let mut overlay_ids = HashSet::with_capacity(self.overlays.len());
         for overlay in &self.overlays {
             validate_overlay(overlay, self.timeline.in_ms, self.timeline.out_ms)?;
+            let id = match overlay {
+                Overlay::Image { base, .. } | Overlay::Caption { base, .. } => &base.id,
+            };
+            if !overlay_ids.insert(id) {
+                return Err(AppError::invalid_argument(
+                    "Overlay IDs must be unique within a project.",
+                ));
+            }
         }
         validate_export_settings(&self.export_defaults)
     }
@@ -377,8 +406,13 @@ fn validate_overlay(
     timeline_in_ms: u64,
     timeline_out_ms: u64,
 ) -> Result<(), AppError> {
-    let (base, assets): (&OverlayBase, Vec<&AssetRef>) = match overlay {
-        Overlay::Image { base, asset } => (base, vec![asset]),
+    let (base, asset, expected_parent, expected_mime): (
+        &OverlayBase,
+        &AssetRef,
+        &str,
+        Option<&str>,
+    ) = match overlay {
+        Overlay::Image { base, asset } => (base, asset, "assets/overlays", None),
         Overlay::Caption {
             base,
             caption,
@@ -386,7 +420,7 @@ fn validate_overlay(
             ..
         } => {
             validate_caption(caption)?;
-            (base, vec![generated_asset])
+            (base, generated_asset, "assets/captions", Some("image/png"))
         }
     };
 
@@ -405,8 +439,13 @@ fn validate_overlay(
         ));
     }
     validate_rect(&base.position, true)?;
-    for asset in assets {
-        validate_asset(asset)?;
+    validate_asset(asset)?;
+    if !Path::new(&asset.relative_path).starts_with(expected_parent)
+        || expected_mime.is_some_and(|mime| asset.mime_type != mime)
+    {
+        return Err(AppError::project_schema(
+            "Overlay assets must remain in their matching project asset folder.",
+        ));
     }
     Ok(())
 }

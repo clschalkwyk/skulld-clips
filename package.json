@@ -25,6 +25,7 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "@fontsource/inter": "5.3.0",
     "@tauri-apps/api": "2.11.1"
   },
   "devDependencies": {

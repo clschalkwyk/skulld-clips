@@ -104,7 +104,7 @@ pub fn create_project(
     fs::create_dir_all(projects_root).map_err(|_| project_folder_error())?;
     let project_dir = projects_root.join(&id);
     for relative in [
-        "assets/images",
+        "assets/overlays",
         "assets/captions",
         "cache",
         "renders/.partial",
@@ -125,6 +125,7 @@ pub fn load_project(project_path: &Path) -> Result<LoadedProject, AppError> {
     let canonical = fs::canonicalize(project_path).map_err(|_| project_open_error())?;
     let project = read_project(&canonical)?;
     validate_project_location(&canonical, &project)?;
+    crate::services::assets::validate_project_assets(&canonical, &project, true)?;
     let source_status = source_status(&project);
     Ok(LoadedProject {
         project_path: canonical,
@@ -137,6 +138,7 @@ pub fn save_project(project_path: &Path, mut project: ProjectV1) -> Result<Saved
     let canonical = fs::canonicalize(project_path).map_err(|_| project_open_error())?;
     let persisted = read_project(&canonical)?;
     validate_project_location(&canonical, &persisted)?;
+    crate::services::assets::validate_project_assets(&canonical, &persisted, false)?;
     if project.id != persisted.id
         || project.created_at != persisted.created_at
         || project.source != persisted.source
@@ -149,6 +151,7 @@ pub fn save_project(project_path: &Path, mut project: ProjectV1) -> Result<Saved
 
     project.updated_at = Utc::now().to_rfc3339();
     project.validate()?;
+    crate::services::assets::validate_project_assets(&canonical, &project, false)?;
     let bytes = serialize_project(&project)?;
     let project_sha256 = sha256_hex(&bytes);
     atomic_write_bytes(&canonical, &bytes)?;
