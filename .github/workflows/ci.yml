@@ -42,14 +42,28 @@ jobs:
         run: npm ci
 
       - name: Validate specification and contract files
-        shell: bash
+        shell: pwsh
         run: |
-          shasum -a 256 -c MANIFEST.sha256
-          jq empty spec-manifest.json \
-            contracts/project.schema.json \
-            contracts/export-events.schema.json \
-            examples/example-project.skcf.json \
-            release/RELEASE_MANIFEST.schema.json
+          foreach ($line in Get-Content MANIFEST.sha256) {
+            if ($line -notmatch "^([0-9a-f]{64})  (.+)$") {
+              throw "Malformed checksum manifest line: $line"
+            }
+            $expected = $Matches[1]
+            $path = $Matches[2]
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) {
+              throw "Checksum mismatch: $path"
+            }
+          }
+          @(
+            "spec-manifest.json",
+            "contracts/project.schema.json",
+            "contracts/export-events.schema.json",
+            "examples/example-project.skcf.json",
+            "release/RELEASE_MANIFEST.schema.json"
+          ) | ForEach-Object {
+            Get-Content -Raw -LiteralPath $_ | ConvertFrom-Json | Out-Null
+          }
 
       - name: Lint frontend
         run: npm run lint
