@@ -349,8 +349,10 @@ fn replace_with_backup(path: &Path, temporary: &Path) -> std::io::Result<()> {
 
 #[cfg(windows)]
 fn replace_with_backup(path: &Path, temporary: &Path) -> std::io::Result<()> {
-    use std::{iter, os::windows::ffi::OsStrExt, ptr};
-    use windows_sys::Win32::Storage::FileSystem::{ReplaceFileW, REPLACEFILE_WRITE_THROUGH};
+    use std::{iter, os::windows::ffi::OsStrExt};
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+    };
 
     if !path.exists() {
         return fs::rename(temporary, path);
@@ -359,6 +361,7 @@ fn replace_with_backup(path: &Path, temporary: &Path) -> std::io::Result<()> {
     if fs::symlink_metadata(&backup_path).is_ok() {
         fs::remove_file(&backup_path)?;
     }
+    fs::copy(path, backup_path)?;
     let destination: Vec<u16> = path
         .as_os_str()
         .encode_wide()
@@ -369,19 +372,11 @@ fn replace_with_backup(path: &Path, temporary: &Path) -> std::io::Result<()> {
         .encode_wide()
         .chain(iter::once(0))
         .collect();
-    let backup: Vec<u16> = backup_path
-        .as_os_str()
-        .encode_wide()
-        .chain(iter::once(0))
-        .collect();
     let result = unsafe {
-        ReplaceFileW(
-            destination.as_ptr(),
+        MoveFileExW(
             replacement.as_ptr(),
-            backup.as_ptr(),
-            REPLACEFILE_WRITE_THROUGH,
-            ptr::null_mut(),
-            ptr::null_mut(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
         )
     };
     if result == 0 {
