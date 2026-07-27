@@ -47,6 +47,62 @@ pub struct AppError {
 }
 
 impl AppError {
+    pub fn invalid_argument(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::InvalidArgument,
+            message: "The request contains invalid values.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn media_unsupported(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::MediaUnsupported,
+            message: "The selected file is not supported media.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn project_schema(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::ProjectSchema,
+            message: "The project file is invalid or unsupported.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn source_missing() -> Self {
+        Self {
+            code: AppErrorCode::SourceMissing,
+            message: "The project source file is missing.".to_owned(),
+            safe_detail: Some("Choose the moved source file to relink the project.".to_owned()),
+            retryable: false,
+        }
+    }
+
+    pub fn source_changed() -> Self {
+        Self {
+            code: AppErrorCode::SourceChanged,
+            message: "The project source file has changed.".to_owned(),
+            safe_detail: Some(
+                "Choose the original file or explicitly accept the replacement.".to_owned(),
+            ),
+            retryable: false,
+        }
+    }
+
+    pub fn io(message: impl Into<String>, safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::Io,
+            message: message.into(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: true,
+        }
+    }
+
     pub fn media_tool_failed(tool: &str, safe_detail: impl Into<String>) -> Self {
         let code = match tool {
             "ffprobe" => AppErrorCode::FfprobeFailed,

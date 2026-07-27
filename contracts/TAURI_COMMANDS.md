@@ -8,6 +8,18 @@
 - No executable names, shell commands or raw FFmpeg args from frontend.
 - Export receives an immutable project snapshot.
 
+## Native file selection
+
+```ts
+select_media_file(): string | null
+select_project_file(): string | null
+select_projects_folder(): string | null
+```
+
+Selection happens in Rust. Returned paths are authorized for the matching
+follow-up command. Native drag-and-drop paths are authorized by the Rust webview
+event handler before the frontend receives the drop event.
+
 ## `probe_media`
 
 ```ts
@@ -67,6 +79,17 @@ output: {
   fingerprintMatched: boolean;
 }
 ```
+
+## Recent projects
+
+```ts
+list_recent_projects(): RecentProject[]
+remove_recent_project({ projectPath: string }): void
+```
+
+The Rust-owned Tauri store retains at most 20 entries. Listing refreshes the
+source status for readable projects and authorizes those stored project paths for
+reopening.
 
 ## `import_overlay_asset`
 

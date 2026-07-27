@@ -1,7 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import type { AppError, RuntimeInfo } from "../contracts/runtime";
-import type { AppErrorCode } from "../../contracts/types";
+import type {
+  AppErrorCode,
+  CreateProjectResult,
+  LoadProjectResult,
+  MediaProbe,
+  ProjectV1,
+  RecentProject,
+  RelinkSourceResult,
+  SaveProjectResult,
+} from "../../contracts/types";
 
 export type InvokeFn = <T>(
   command: string,
@@ -67,4 +78,110 @@ export async function getRuntimeInfo(
   } catch (error) {
     throw normalizeAppError(error);
   }
+}
+
+async function invokeNative<T>(
+  command: string,
+  args?: Record<string, unknown>,
+  invokeCommand: InvokeFn = invoke,
+): Promise<T> {
+  try {
+    return await invokeCommand<T>(command, args);
+  } catch (error) {
+    throw normalizeAppError(error);
+  }
+}
+
+export function selectMediaFile(
+  invokeCommand: InvokeFn = invoke,
+): Promise<string | null> {
+  return invokeNative("select_media_file", undefined, invokeCommand);
+}
+
+export function selectProjectFile(
+  invokeCommand: InvokeFn = invoke,
+): Promise<string | null> {
+  return invokeNative("select_project_file", undefined, invokeCommand);
+}
+
+export function probeMedia(
+  path: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<MediaProbe> {
+  return invokeNative("probe_media", { path }, invokeCommand);
+}
+
+export function createProject(
+  sourcePath: string,
+  projectName?: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<CreateProjectResult> {
+  return invokeNative(
+    "create_project",
+    { sourcePath, projectName, projectsRoot: null },
+    invokeCommand,
+  );
+}
+
+export function loadProject(
+  projectPath: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<LoadProjectResult> {
+  return invokeNative("load_project", { projectPath }, invokeCommand);
+}
+
+export function saveProject(
+  projectPath: string,
+  project: ProjectV1,
+  invokeCommand: InvokeFn = invoke,
+): Promise<SaveProjectResult> {
+  return invokeNative("save_project", { projectPath, project }, invokeCommand);
+}
+
+export function relinkSource(
+  projectPath: string,
+  replacementPath: string,
+  acceptFingerprintMismatch: boolean,
+  invokeCommand: InvokeFn = invoke,
+): Promise<RelinkSourceResult> {
+  return invokeNative(
+    "relink_source",
+    { projectPath, replacementPath, acceptFingerprintMismatch },
+    invokeCommand,
+  );
+}
+
+export function listRecentProjects(
+  invokeCommand: InvokeFn = invoke,
+): Promise<RecentProject[]> {
+  return invokeNative("list_recent_projects", undefined, invokeCommand);
+}
+
+export function removeRecentProject(
+  projectPath: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<void> {
+  return invokeNative("remove_recent_project", { projectPath }, invokeCommand);
+}
+
+export function listenForFileDrops(
+  onDrop: (paths: string[]) => void,
+  onActiveChange: (active: boolean) => void,
+): Promise<UnlistenFn> {
+  return getCurrentWebview().onDragDropEvent(({ payload }) => {
+    switch (payload.type) {
+      case "enter":
+        onActiveChange(true);
+        break;
+      case "drop":
+        onActiveChange(false);
+        onDrop(payload.paths);
+        break;
+      case "leave":
+        onActiveChange(false);
+        break;
+      case "over":
+        break;
+    }
+  });
 }

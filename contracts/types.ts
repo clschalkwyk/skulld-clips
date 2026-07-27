@@ -124,6 +124,39 @@ export interface ProjectV1 {
   exportDefaults: ExportSettings;
 }
 
+export type SourceStatus = "ok" | "missing" | "changed";
+
+export interface CreateProjectResult {
+  projectPath: string;
+  project: ProjectV1;
+}
+
+export interface LoadProjectResult {
+  projectPath: string;
+  project: ProjectV1;
+  sourceStatus: SourceStatus;
+  migrationApplied: boolean;
+}
+
+export interface SaveProjectResult {
+  savedAt: string;
+  projectSha256: string;
+}
+
+export interface RelinkSourceResult {
+  project: ProjectV1;
+  fingerprintMatched: boolean;
+}
+
+export interface RecentProject {
+  projectPath: string;
+  name: string;
+  sourceFilename: string;
+  lastOpenedAt: string;
+  sourceStatus: SourceStatus;
+  durationMs: Milliseconds;
+}
+
 export type AppErrorCode =
   | "E_INVALID_ARGUMENT"
   | "E_MEDIA_UNSUPPORTED"

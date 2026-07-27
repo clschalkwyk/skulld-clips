@@ -1,129 +1,511 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import type { AppError, RuntimeInfo } from "./contracts/runtime";
-  import { getRuntimeInfo, normalizeAppError } from "./services/tauri";
+  import type {
+    AppError,
+    LoadProjectResult,
+    RecentProject,
+  } from "../contracts/types";
+  import type { RuntimeInfo } from "./contracts/runtime";
+  import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
+  import {
+    createProject,
+    getRuntimeInfo,
+    listRecentProjects,
+    listenForFileDrops,
+    loadProject,
+    normalizeAppError,
+    relinkSource,
+    removeRecentProject,
+    saveProject,
+    selectMediaFile,
+    selectProjectFile,
+  } from "./services/tauri";
+
+  type BusyAction = "importing" | "opening" | "relinking" | null;
+  type SaveState = "saved" | "unsaved" | "saving" | "error";
 
   let runtime = $state<RuntimeInfo | null>(null);
-  let error = $state<AppError | null>(null);
-  let loading = $state(true);
+  let runtimeError = $state<AppError | null>(null);
+  let recents = $state<RecentProject[]>([]);
+  let recentsLoading = $state(true);
+  let session = $state<LoadProjectResult | null>(null);
+  let actionError = $state<AppError | null>(null);
+  let busyAction = $state<BusyAction>(null);
+  let dropActive = $state(false);
+  let saveState = $state<SaveState>("saved");
+  let pendingReplacementPath = $state<string | null>(null);
 
-  const platformLabel = $derived(
-    runtime ? `${runtime.os} · ${runtime.arch}` : "Detecting local runtime",
+  let autosave: AutosaveScheduler | null = null;
+  let unlistenDrop: (() => void) | null = null;
+
+  const sourceStatusLabel = $derived(
+    session?.sourceStatus === "missing"
+      ? "Source missing"
+      : session?.sourceStatus === "changed"
+        ? "Source changed"
+        : "Source verified",
   );
 
-  async function loadRuntime(): Promise<void> {
-    loading = true;
-    error = null;
+  onMount(() => {
+    void bootstrap();
+    return () => {
+      unlistenDrop?.();
+      autosave?.dispose();
+    };
+  });
 
+  async function bootstrap(): Promise<void> {
+    const [runtimeResult] = await Promise.allSettled([
+      loadRuntime(),
+      refreshRecents(),
+    ]);
+    if (runtimeResult.status === "rejected") {
+      runtimeError = normalizeAppError(runtimeResult.reason);
+    }
     try {
-      runtime = await getRuntimeInfo();
-    } catch (reason) {
-      runtime = null;
-      error = normalizeAppError(reason);
-    } finally {
-      loading = false;
+      unlistenDrop = await listenForFileDrops(
+        (paths) => {
+          if (!session && paths[0]) {
+            void importClip(paths[0]);
+          }
+        },
+        (active) => {
+          dropActive = active;
+        },
+      );
+    } catch (error) {
+      runtimeError = normalizeAppError(error);
     }
   }
 
-  onMount(() => {
-    void loadRuntime();
-  });
+  async function loadRuntime(): Promise<void> {
+    runtimeError = null;
+    try {
+      runtime = await getRuntimeInfo();
+    } catch (error) {
+      runtime = null;
+      runtimeError = normalizeAppError(error);
+    }
+  }
+
+  async function refreshRecents(): Promise<void> {
+    recentsLoading = true;
+    try {
+      recents = await listRecentProjects();
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    } finally {
+      recentsLoading = false;
+    }
+  }
+
+  async function chooseClip(): Promise<void> {
+    actionError = null;
+    try {
+      const path = await selectMediaFile();
+      if (path) {
+        await importClip(path);
+      }
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    }
+  }
+
+  async function importClip(path: string): Promise<void> {
+    busyAction = "importing";
+    actionError = null;
+    try {
+      const created = await createProject(path);
+      openSession({
+        ...created,
+        sourceStatus: "ok",
+        migrationApplied: false,
+      });
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    } finally {
+      busyAction = null;
+    }
+  }
+
+  async function chooseProject(): Promise<void> {
+    actionError = null;
+    try {
+      const path = await selectProjectFile();
+      if (path) {
+        await openProject(path);
+      }
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    }
+  }
+
+  async function openProject(projectPath: string): Promise<void> {
+    busyAction = "opening";
+    actionError = null;
+    try {
+      openSession(await loadProject(projectPath));
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    } finally {
+      busyAction = null;
+    }
+  }
+
+  function openSession(next: LoadProjectResult): void {
+    autosave?.dispose();
+    session = next;
+    pendingReplacementPath = null;
+    saveState = "saved";
+    autosave = createAutosaveScheduler(persistProject);
+  }
+
+  function updateProjectName(event: Event): void {
+    if (!session) {
+      return;
+    }
+    session.project.name = (event.currentTarget as HTMLInputElement).value;
+    saveState = "unsaved";
+    autosave?.markDirty();
+  }
+
+  async function persistProject(): Promise<void> {
+    const active = session;
+    if (!active) {
+      return;
+    }
+    saveState = "saving";
+    actionError = null;
+    try {
+      const saved = await saveProject(active.projectPath, active.project);
+      if (session?.projectPath === active.projectPath) {
+        session.project.updatedAt = saved.savedAt;
+        saveState = "saved";
+      }
+    } catch (error) {
+      if (session?.projectPath === active.projectPath) {
+        saveState = "error";
+        actionError = normalizeAppError(error);
+      }
+    }
+  }
+
+  async function backToHome(): Promise<void> {
+    await autosave?.flush();
+    autosave?.dispose();
+    autosave = null;
+    session = null;
+    pendingReplacementPath = null;
+    await refreshRecents();
+  }
+
+  async function chooseReplacement(): Promise<void> {
+    if (!session) {
+      return;
+    }
+    actionError = null;
+    try {
+      const path = await selectMediaFile();
+      if (path) {
+        await applyReplacement(path, false);
+      }
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    }
+  }
+
+  async function applyReplacement(
+    replacementPath: string,
+    acceptMismatch: boolean,
+  ): Promise<void> {
+    if (!session) {
+      return;
+    }
+    busyAction = "relinking";
+    actionError = null;
+    try {
+      const result = await relinkSource(
+        session.projectPath,
+        replacementPath,
+        acceptMismatch,
+      );
+      session.project = result.project;
+      session.sourceStatus = "ok";
+      pendingReplacementPath = null;
+      saveState = "saved";
+      await refreshRecents();
+    } catch (error) {
+      const normalized = normalizeAppError(error);
+      if (normalized.code === "E_SOURCE_CHANGED" && !acceptMismatch) {
+        pendingReplacementPath = replacementPath;
+      }
+      actionError = normalized;
+    } finally {
+      busyAction = null;
+    }
+  }
+
+  async function removeRecent(path: string): Promise<void> {
+    actionError = null;
+    try {
+      await removeRecentProject(path);
+      recents = recents.filter((recent) => recent.projectPath !== path);
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    }
+  }
+
+  function formatDuration(durationMs: number): string {
+    const totalSeconds = Math.round(durationMs / 1_000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  function formatDate(value: string): string {
+    const date = new Date(value);
+    return Number.isNaN(date.valueOf())
+      ? "Last opened time unavailable"
+      : date.toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+  }
 </script>
 
 <svelte:head>
   <title>Skull’d Clip Forge</title>
 </svelte:head>
 
-<main>
-  <header class="masthead">
-    <a class="brand" href="/" aria-label="Skull’d Clip Forge home">
-      <span class="brand-mark" aria-hidden="true">SCF</span>
-      <span>
-        <strong>Skull’d</strong>
-        <small>Clip Forge</small>
+{#if session}
+  <main class="editor-shell">
+    <header class="editor-bar">
+      <button class="text-button" type="button" onclick={backToHome}>← Projects</button>
+      <label class="project-name">
+        <span>Project name</span>
+        <input
+          aria-label="Project name"
+          maxlength="120"
+          value={session.project.name}
+          oninput={updateProjectName}
+        />
+      </label>
+      <span class:error-text={saveState === "error"} class="save-state" aria-live="polite">
+        {saveState === "saved"
+          ? "Saved"
+          : saveState === "saving"
+            ? "Saving…"
+            : saveState === "unsaved"
+              ? "Waiting to save"
+              : "Save failed"}
       </span>
-    </a>
-    <span class="local-badge">Local only</span>
-  </header>
+      <button class="primary-button" type="button" disabled title="Export arrives in M4">
+        Export
+      </button>
+    </header>
 
-  <section class="hero" aria-labelledby="page-title">
-    <p class="eyebrow">Gameplay in. Vertical clip out.</p>
-    <h1 id="page-title">Forge the moment.<br />Skip the editing suite.</h1>
-    <p class="intro">
-      A focused desktop workflow for turning one local gameplay clip into a
-      branded 9:16 MP4. No account, upload, cloud, or publishing API.
-    </p>
-  </section>
-
-  <section class="runtime-card" aria-labelledby="runtime-heading">
-    <div class="runtime-heading">
-      <div>
-        <p class="section-label">Native boundary</p>
-        <h2 id="runtime-heading">Runtime readiness</h2>
-      </div>
-      <span class:ready={runtime !== null} class:error={error !== null} class="status-dot">
-        {#if loading}
-          Checking
-        {:else if runtime}
-          Ready
-        {:else}
-          Needs attention
-        {/if}
-      </span>
-    </div>
-
-    {#if loading}
-      <div class="loading-state" aria-live="polite">
-        <span class="spinner" aria-hidden="true"></span>
-        <span>Verifying the Rust and media-tool boundary…</span>
-      </div>
-    {:else if error}
-      <div class="error-state" role="alert">
-        <strong>{error.message}</strong>
-        {#if error.safeDetail}
-          <p>{error.safeDetail}</p>
-        {/if}
-        <code>{error.code}</code>
-        {#if error.retryable}
-          <button type="button" onclick={loadRuntime}>Retry check</button>
-        {/if}
-      </div>
-    {:else if runtime}
-      <dl class="runtime-grid">
+    {#if session.sourceStatus !== "ok"}
+      <section class:warning={session.sourceStatus === "changed"} class="source-alert" role="alert">
         <div>
-          <dt>Application</dt>
-          <dd>v{runtime.appVersion}</dd>
+          <strong>{sourceStatusLabel}</strong>
+          <p>
+            {session.sourceStatus === "missing"
+              ? "The original video is no longer at its saved location. Relink it to continue."
+              : "The source content no longer matches this project. Choose the original or explicitly accept a replacement."}
+          </p>
         </div>
-        <div>
-          <dt>Platform</dt>
-          <dd>{platformLabel}</dd>
-        </div>
-        <div>
-          <dt>ffmpeg</dt>
-          <dd>{runtime.ffmpegVersion}</dd>
-        </div>
-        <div>
-          <dt>ffprobe</dt>
-          <dd>{runtime.ffprobeVersion}</dd>
-        </div>
-        <div>
-          <dt>Project schema</dt>
-          <dd>v{runtime.projectSchemaVersion}</dd>
-        </div>
-        <div>
-          <dt>Media tools</dt>
-          <dd>{runtime.bundledSidecars ? "Pinned sidecars" : "Development paths"}</dd>
-        </div>
-      </dl>
-      <p class="boundary-note">
-        Process execution stays in Rust. The webview has no shell permission.
-      </p>
+        <button type="button" onclick={chooseReplacement} disabled={busyAction === "relinking"}>
+          {busyAction === "relinking" ? "Checking…" : "Choose source"}
+        </button>
+      </section>
     {/if}
-  </section>
 
-  <footer>
-    <span>Milestone 0 · Scaffold and boundary</span>
-    <span>Offline by design</span>
-  </footer>
-</main>
+    {#if actionError}
+      <section class="inline-error" role="alert">
+        <div>
+          <strong>{actionError.message}</strong>
+          {#if actionError.safeDetail}<p>{actionError.safeDetail}</p>{/if}
+        </div>
+        <code>{actionError.code}</code>
+        {#if pendingReplacementPath}
+          <button
+            type="button"
+            onclick={() => applyReplacement(pendingReplacementPath!, true)}
+            disabled={busyAction === "relinking"}
+          >
+            Use changed source
+          </button>
+        {/if}
+      </section>
+    {/if}
+
+    <section class="editor-grid">
+      <aside class="panel layers-panel">
+        <p class="section-label">Project</p>
+        <h2>Layers</h2>
+        <div class="empty-panel">
+          <strong>Source video</strong>
+          <span>{session.project.source.filename}</span>
+          <small>Overlays become available in M3.</small>
+        </div>
+      </aside>
+
+      <section class="preview-panel" aria-labelledby="preview-heading">
+        <div class="preview-stage">
+          <div class="canvas-frame">
+            <span>9:16</span>
+            <strong id="preview-heading">Preview workspace</strong>
+            <small>Interactive playback and crop controls arrive in M2.</small>
+          </div>
+        </div>
+        <div class="source-meta">
+          <span>{session.project.source.probe.video.displayWidth} × {session.project.source.probe.video.displayHeight}</span>
+          <span>{formatDuration(session.project.source.probe.durationMs)}</span>
+          <span>{session.project.source.probe.hasAudio ? "Audio detected" : "Silent source"}</span>
+        </div>
+      </section>
+
+      <aside class="panel inspector-panel">
+        <p class="section-label">Source</p>
+        <h2>{sourceStatusLabel}</h2>
+        <dl class="detail-list">
+          <div><dt>Codec</dt><dd>{session.project.source.probe.video.codec}</dd></div>
+          <div><dt>Container</dt><dd>{session.project.source.probe.containerName}</dd></div>
+          <div><dt>Rotation</dt><dd>{session.project.source.probe.video.rotationDegrees}°</dd></div>
+          <div><dt>Trim</dt><dd>Full source</dd></div>
+        </dl>
+        {#if session.project.source.probe.warnings.length > 0}
+          <div class="probe-warnings">
+            <strong>Probe notes</strong>
+            {#each session.project.source.probe.warnings as warning (warning)}
+              <p>{warning}</p>
+            {/each}
+          </div>
+        {/if}
+      </aside>
+    </section>
+
+    <footer class="editor-footer">
+      <span>Milestone 1 · Import, projects, autosave</span>
+      <span>Local project · schema v{session.project.schemaVersion}</span>
+    </footer>
+  </main>
+{:else}
+  <main class="home-shell">
+    <header class="masthead">
+      <div class="brand" aria-label="Skull’d Clip Forge">
+        <span class="brand-mark" aria-hidden="true">SCF</span>
+        <span><strong>Skull’d</strong><small>Clip Forge</small></span>
+      </div>
+      <span class="local-badge">Local only</span>
+    </header>
+
+    <section class="home-hero" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">Gameplay in. Vertical clip out.</p>
+        <h1 id="page-title">Forge the moment.</h1>
+        <p class="intro">
+          Turn one local gameplay clip into a focused 9:16 project. Your media
+          stays on this device.
+        </p>
+      </div>
+      <div
+        class:drop-active={dropActive}
+        class:busy={busyAction === "importing"}
+        class="drop-zone"
+        aria-live="polite"
+      >
+        <span class="drop-icon" aria-hidden="true">↓</span>
+        <strong>
+          {dropActive
+            ? "Release to open clip"
+            : busyAction === "importing"
+              ? "Reading clip details…"
+              : "Drop a gameplay clip here"}
+        </strong>
+        <span>MP4, MOV, MKV, WebM, M4V, or AVI</span>
+        <div class="home-actions">
+          <button
+            class="primary-button"
+            type="button"
+            onclick={chooseClip}
+            disabled={busyAction !== null}
+          >
+            Open clip
+          </button>
+          <button
+            class="secondary-button"
+            type="button"
+            onclick={chooseProject}
+            disabled={busyAction !== null}
+          >
+            Open project
+          </button>
+        </div>
+      </div>
+    </section>
+
+    {#if actionError}
+      <section class="inline-error home-error" role="alert">
+        <div>
+          <strong>{actionError.message}</strong>
+          {#if actionError.safeDetail}<p>{actionError.safeDetail}</p>{/if}
+        </div>
+        <code>{actionError.code}</code>
+      </section>
+    {/if}
+
+    <section class="recents-section" aria-labelledby="recents-heading">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Continue locally</p>
+          <h2 id="recents-heading">Recent projects</h2>
+        </div>
+        <button class="text-button" type="button" onclick={refreshRecents}>Refresh</button>
+      </div>
+
+      {#if recentsLoading}
+        <div class="loading-state"><span class="spinner" aria-hidden="true"></span>Loading projects…</div>
+      {:else if recents.length === 0}
+        <div class="empty-recents">
+          <strong>No projects yet</strong>
+          <p>Open a gameplay clip to create the first local project.</p>
+        </div>
+      {:else}
+        <div class="recent-grid">
+          {#each recents as recent (recent.projectPath)}
+            <article class="recent-card">
+              <div class="recent-status" data-status={recent.sourceStatus}>
+                {recent.sourceStatus === "ok" ? "Ready" : recent.sourceStatus}
+              </div>
+              <h3>{recent.name}</h3>
+              <p>{recent.sourceFilename}</p>
+              <div class="recent-meta">
+                <span>{formatDuration(recent.durationMs)}</span>
+                <span>{formatDate(recent.lastOpenedAt)}</span>
+              </div>
+              <div class="recent-actions">
+                <button type="button" onclick={() => openProject(recent.projectPath)}>Open</button>
+                <button type="button" onclick={() => removeRecent(recent.projectPath)}>
+                  Remove from recents
+                </button>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <footer>
+      <span>
+        {runtime
+          ? `${runtime.os} · ffmpeg ${runtime.ffmpegVersion} · ffprobe ${runtime.ffprobeVersion}`
+          : runtimeError
+            ? "Media runtime needs attention"
+            : "Checking local media runtime…"}
+      </span>
+      <span>Offline by design</span>
+    </footer>
+  </main>
+{/if}

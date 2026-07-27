@@ -2,16 +2,14 @@ use std::{
     env,
     ffi::OsString,
     fs,
-    io::{self, Read},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    thread,
     time::Duration,
 };
 
-use wait_timeout::ChildExt;
-
-use crate::domain::{AppError, RuntimeInfo};
+use crate::{
+    domain::{AppError, RuntimeInfo},
+    services::process::{self, ProcessError},
+};
 
 const PROJECT_SCHEMA_VERSION: u32 = 1;
 const TOOL_TIMEOUT: Duration = Duration::from_secs(5);
@@ -63,6 +61,10 @@ pub fn collect_runtime_info(
         ffprobe_version,
         bundled_sidecars: ffmpeg.bundled && ffprobe.bundled,
     })
+}
+
+pub fn resolve_ffprobe_path(resource_dir: Option<&Path>) -> Result<PathBuf, AppError> {
+    resolve_media_tool(MediaTool::Ffprobe, resource_dir).map(|tool| tool.path)
 }
 
 fn resolve_media_tool(
@@ -187,63 +189,23 @@ fn target_triple() -> &'static str {
 }
 
 fn read_tool_version(tool: MediaTool, path: &Path) -> Result<String, AppError> {
-    let mut child = Command::new(path)
-        .arg("-version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|_| {
-            AppError::media_tool_failed(
-                tool.command_name(),
-                "The configured media tool could not be started.",
-            )
-        })?;
+    let output = process::run_bounded(
+        path,
+        &[OsString::from("-version")],
+        TOOL_TIMEOUT,
+        MAX_TOOL_OUTPUT_BYTES,
+    )
+    .map_err(|error| map_process_error(tool, error))?;
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| AppError::internal("The media-tool stdout stream could not be captured."))?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| AppError::internal("The media-tool stderr stream could not be captured."))?;
-
-    let stdout_reader = thread::spawn(move || read_limited(stdout));
-    let stderr_reader = thread::spawn(move || read_limited(stderr));
-
-    let status = match child.wait_timeout(TOOL_TIMEOUT) {
-        Ok(Some(status)) => status,
-        Ok(None) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(AppError::media_tool_failed(
-                tool.command_name(),
-                "The version check timed out.",
-            ));
-        }
-        Err(_) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(AppError::media_tool_failed(
-                tool.command_name(),
-                "The version check could not be completed.",
-            ));
-        }
-    };
-
-    let stdout = join_reader(stdout_reader)?;
-    let stderr = join_reader(stderr_reader)?;
-
-    if !status.success() {
+    if !output.status.success() {
         return Err(AppError::media_tool_failed(
             tool.command_name(),
-            format!("The version check exited with status {status}."),
+            format!("The version check exited with status {}.", output.status),
         ));
     }
 
-    parse_version(tool, &stdout)
-        .or_else(|| parse_version(tool, &stderr))
+    parse_version(tool, &output.stdout)
+        .or_else(|| parse_version(tool, &output.stderr))
         .ok_or_else(|| {
             AppError::media_tool_failed(
                 tool.command_name(),
@@ -252,27 +214,18 @@ fn read_tool_version(tool: MediaTool, path: &Path) -> Result<String, AppError> {
         })
 }
 
-fn read_limited<R: Read>(reader: R) -> io::Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    reader
-        .take(MAX_TOOL_OUTPUT_BYTES + 1)
-        .read_to_end(&mut bytes)?;
+fn map_process_error(tool: MediaTool, error: ProcessError) -> AppError {
+    let detail = match error {
+        ProcessError::Timeout => "The version check timed out.",
+        ProcessError::OutputLimit => "The version output exceeded the safety limit.",
+        ProcessError::Spawn => "The configured media tool could not be started.",
+        ProcessError::MissingPipe
+        | ProcessError::Wait
+        | ProcessError::OutputRead
+        | ProcessError::ReaderStopped => "The version check could not be completed.",
+    };
 
-    if bytes.len() as u64 > MAX_TOOL_OUTPUT_BYTES {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "media-tool output exceeded the limit",
-        ));
-    }
-
-    Ok(bytes)
-}
-
-fn join_reader(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> Result<Vec<u8>, AppError> {
-    reader
-        .join()
-        .map_err(|_| AppError::internal("A media-tool output reader stopped unexpectedly."))?
-        .map_err(|_| AppError::internal("Media-tool output could not be read."))
+    AppError::media_tool_failed(tool.command_name(), detail)
 }
 
 fn parse_version(tool: MediaTool, bytes: &[u8]) -> Option<String> {

@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { RuntimeInfo } from "../contracts/runtime";
 import {
+  createProject,
   getRuntimeInfo,
+  loadProject,
   normalizeAppError,
+  saveProject,
   type InvokeFn,
 } from "./tauri";
+import type { ProjectV1 } from "../../contracts/types";
 
 const runtimeInfo: RuntimeInfo = {
   appVersion: "0.1.0",
@@ -47,6 +51,30 @@ describe("normalizeAppError", () => {
       message: "The native application returned an unexpected error.",
       safeDetail: null,
       retryable: true,
+    });
+  });
+});
+
+describe("project commands", () => {
+  it("uses camel-case payloads through the single invoke boundary", async () => {
+    const invokeCommand = vi.fn(async () => ({})) as InvokeFn;
+    const project = {} as ProjectV1;
+
+    await createProject("/clips/source.mp4", "Boss fight", invokeCommand);
+    await loadProject("/projects/id/project.skcf.json", invokeCommand);
+    await saveProject("/projects/id/project.skcf.json", project, invokeCommand);
+
+    expect(invokeCommand).toHaveBeenNthCalledWith(1, "create_project", {
+      sourcePath: "/clips/source.mp4",
+      projectName: "Boss fight",
+      projectsRoot: null,
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(2, "load_project", {
+      projectPath: "/projects/id/project.skcf.json",
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(3, "save_project", {
+      projectPath: "/projects/id/project.skcf.json",
+      project,
     });
   });
 });
