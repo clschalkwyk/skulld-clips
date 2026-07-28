@@ -126,13 +126,15 @@ input: { projectPath: string; sourceAssetPath: string }
 output: StingAssetRef
 ```
 
-Accept one user-selected square MP4 up to 50 MiB and 10 seconds, probe it through the
+Accept a user-selected square MP4 up to 50 MiB and 10 seconds, probe it through the
 Rust-owned media boundary, copy it into `assets/stings`, and record its content
 hash, dimensions, duration, and audio presence. Rust also creates a bounded
-transparent PNG preview sprite with the same fixed chroma-key profile. The frontend may select the
-fixed `toasty-right` preset and whether the verified clip audio is included; it
-may not supply a chroma-key expression, playback-rate expression, filter
-fragment, or FFmpeg argument.
+transparent PNG preview sprite with the same fixed chroma-key profile. The
+frontend may select the fixed `toasty-right` preset, a validated 1×/2×/3× rate,
+once/repeat mode, bounded timing, and whether verified clip audio is included.
+It may not supply a chroma-key expression, playback-rate expression, filter
+fragment, or FFmpeg argument. A project may reference a content-addressed
+import from more than one sting overlay, subject to project validation.
 
 ## `validate_export`
 

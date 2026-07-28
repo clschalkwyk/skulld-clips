@@ -72,10 +72,11 @@ pub fn build_filter_graph(project: &ProjectV1, frame_rate: u32) -> String {
         let asset_label = format!("overlay{index}");
         let input_index = index + 1;
         if matches!(overlay, Overlay::Sting { .. }) {
+            let playback_rate = overlay.sting_playback_rate().unwrap_or(3);
             let relative_start_ms = base.start_ms - project.timeline.in_ms;
-            let source_window_ms = (base.end_ms - base.start_ms) * 3;
+            let source_window_ms = (base.end_ms - base.start_ms) * u64::from(playback_rate);
             filters.push(format!(
-                "[{input_index}:v:0]trim=start=0:end={},setpts=(PTS-STARTPTS)/3+{}/TB,chromakey=0x06EE11:0.160000:0.050000,format=rgba,scale={}:{}:flags=lanczos,colorchannelmixer=aa={}[{asset_label}]",
+                "[{input_index}:v:0]trim=start=0:end={},setpts=(PTS-STARTPTS)/{playback_rate}+{}/TB,chromakey=0x06EE11:0.160000:0.050000,format=rgba,scale={}:{}:flags=lanczos,colorchannelmixer=aa={}[{asset_label}]",
                 seconds(source_window_ms),
                 seconds(relative_start_ms),
                 position.width,
@@ -121,59 +122,102 @@ pub fn build_filter_graph(project: &ProjectV1, frame_rate: u32) -> String {
         }
     }
 
-    let sting_audio = overlays
+    let sting_audio: Vec<_> = overlays
         .iter()
         .enumerate()
-        .find_map(|(index, overlay)| match overlay {
+        .filter_map(|(index, overlay)| match overlay {
             Overlay::Sting {
                 base,
                 asset,
                 include_audio: true,
+                playback_rate,
                 ..
-            } if asset.has_audio => Some((index + 1, base)),
+            } if asset.has_audio => Some((index + 1, base, playback_rate.unwrap_or(3))),
             Overlay::Image { .. } | Overlay::Caption { .. } | Overlay::Sting { .. } => None,
-        });
-    match (&probe.audio, sting_audio) {
-        (Some(audio), Some((input_index, base))) => {
-            let relative_start_ms = base.start_ms - project.timeline.in_ms;
-            let relative_end_ms = base.end_ms - project.timeline.in_ms;
-            let source_window_ms = (base.end_ms - base.start_ms) * 3;
-            filters.push(format!(
-                "[0:{}]atrim=start={}:end={},asetpts=PTS-STARTPTS,volume=0.720000:enable='between(t,{},{})'[amain]",
-                audio.stream_index,
+        })
+        .collect();
+    let clip_duration_ms = project.timeline.out_ms - project.timeline.in_ms;
+    if let Some(audio) = &probe.audio {
+        let mut audio_steps = vec![
+            format!(
+                "atrim=start={}:end={}",
                 seconds(project.timeline.in_ms),
-                seconds(project.timeline.out_ms),
-                seconds(relative_start_ms),
-                seconds(relative_end_ms),
+                seconds(project.timeline.out_ms)
+            ),
+            "asetpts=PTS-STARTPTS".to_owned(),
+        ];
+        for (_, base, _) in &sting_audio {
+            audio_steps.push(format!(
+                "volume=0.720000:enable='between(t,{},{})'",
+                seconds(base.start_ms - project.timeline.in_ms),
+                seconds(base.end_ms - project.timeline.in_ms),
             ));
-            filters.push(format!(
-                "[{input_index}:a:0]atrim=start=0:end={},asetpts=PTS-STARTPTS,atempo=1.5,atempo=2.0,adelay={relative_start_ms}:all=1[asting]",
-                seconds(source_window_ms),
-            ));
-            filters.push(
-                "[amain][asting]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.950000[aout]"
-                    .to_owned(),
-            );
         }
-        (Some(audio), None) => filters.push(format!(
-            "[0:{}]atrim=start={}:end={},asetpts=PTS-STARTPTS[aout]",
+        let output_label = if sting_audio.is_empty() {
+            "aout"
+        } else {
+            "amain"
+        };
+        filters.push(format!(
+            "[0:{}]{}[{output_label}]",
             audio.stream_index,
-            seconds(project.timeline.in_ms),
-            seconds(project.timeline.out_ms)
-        )),
-        (None, Some((input_index, base))) => {
-            let relative_start_ms = base.start_ms - project.timeline.in_ms;
-            let source_window_ms = (base.end_ms - base.start_ms) * 3;
+            audio_steps.join(","),
+        ));
+    }
+
+    for (branch_index, (input_index, base, playback_rate)) in sting_audio.iter().enumerate() {
+        let relative_start_ms = base.start_ms - project.timeline.in_ms;
+        let source_window_ms = (base.end_ms - base.start_ms) * u64::from(*playback_rate);
+        let mut audio_steps = vec![
+            format!("atrim=start=0:end={}", seconds(source_window_ms)),
+            "asetpts=PTS-STARTPTS".to_owned(),
+        ];
+        audio_steps.extend(audio_speed_filters(*playback_rate));
+        audio_steps.push(format!("adelay={relative_start_ms}:all=1"));
+        filters.push(format!(
+            "[{input_index}:a:0]{}[asting{branch_index}]",
+            audio_steps.join(","),
+        ));
+    }
+
+    if !sting_audio.is_empty() {
+        let mut inputs = Vec::with_capacity(sting_audio.len() + usize::from(probe.audio.is_some()));
+        if probe.audio.is_some() {
+            inputs.push("[amain]".to_owned());
+        }
+        inputs.extend(
+            sting_audio
+                .iter()
+                .enumerate()
+                .map(|(index, _)| format!("[asting{index}]")),
+        );
+        if inputs.len() == 1 {
             filters.push(format!(
-                "[{input_index}:a:0]atrim=start=0:end={},asetpts=PTS-STARTPTS,atempo=1.5,atempo=2.0,adelay={relative_start_ms}:all=1,apad=whole_dur={},atrim=end={}[aout]",
-                seconds(source_window_ms),
-                seconds(project.timeline.out_ms - project.timeline.in_ms),
-                seconds(project.timeline.out_ms - project.timeline.in_ms),
+                "{}apad=whole_dur={},atrim=end={}[aout]",
+                inputs[0],
+                seconds(clip_duration_ms),
+                seconds(clip_duration_ms),
+            ));
+        } else {
+            filters.push(format!(
+                "{}amix=inputs={}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.950000,apad=whole_dur={},atrim=end={}[aout]",
+                inputs.join(""),
+                inputs.len(),
+                seconds(clip_duration_ms),
+                seconds(clip_duration_ms),
             ));
         }
-        (None, None) => {}
     }
     filters.join(";")
+}
+
+fn audio_speed_filters(playback_rate: u8) -> Vec<String> {
+    match playback_rate {
+        1 => Vec::new(),
+        2 => vec!["atempo=2.0".to_owned()],
+        3 => vec!["atempo=1.5".to_owned(), "atempo=2.0".to_owned()],
+        _ => Vec::new(),
+    }
 }
 
 fn sting_x_expression(x: u32, start_ms: u64, end_ms: u64) -> String {

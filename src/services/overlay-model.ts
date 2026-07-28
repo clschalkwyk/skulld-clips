@@ -12,7 +12,10 @@ import type {
 const OUTPUT_WIDTH = 1080;
 const OUTPUT_HEIGHT = 1920;
 const MIN_OVERLAY_PIXELS = 32;
-export const STING_PLAYBACK_RATE = 3;
+export const DEFAULT_STING_PLAYBACK_RATE = 1;
+export const LEGACY_STING_PLAYBACK_RATE = 3;
+export const MAX_STING_OVERLAYS = 8;
+export const MAX_STING_REPEAT_DURATION_MS = 60_000;
 export const STING_ENTRY_MS = 180;
 export const STING_EXIT_MS = 120;
 const OUTPUT_SAFE_X_PX = 24;
@@ -98,7 +101,7 @@ export function createStingOverlay(
   zIndex: number,
 ): StingOverlay {
   const durationMs = Math.min(
-    Math.floor(asset.durationMs / STING_PLAYBACK_RATE),
+    Math.floor(asset.durationMs / DEFAULT_STING_PLAYBACK_RATE),
     outMs - inMs,
   );
   if (durationMs < 500) {
@@ -112,11 +115,103 @@ export function createStingOverlay(
     asset,
     preset: "toasty-right",
     includeAudio: asset.hasAudio,
+    playbackRate: DEFAULT_STING_PLAYBACK_RATE,
+    repeat: false,
     position: stingSafePosition(asset),
     opacity: 1,
     startMs,
     endMs: startMs + durationMs,
     zIndex,
+  };
+}
+
+export function stingPlaybackRate(overlay: StingOverlay): 1 | 2 | 3 {
+  return overlay.playbackRate ?? LEGACY_STING_PLAYBACK_RATE;
+}
+
+export function stingRepeats(overlay: StingOverlay): boolean {
+  return overlay.repeat ?? false;
+}
+
+export function stingCycleDurationMs(overlay: StingOverlay): number {
+  return Math.floor(overlay.asset.durationMs / stingPlaybackRate(overlay));
+}
+
+export function maximumStingDurationMs(
+  overlay: StingOverlay,
+  timelineOutMs: number,
+): number {
+  const available = Math.max(500, timelineOutMs - overlay.startMs);
+  return stingRepeats(overlay)
+    ? Math.min(available, MAX_STING_REPEAT_DURATION_MS)
+    : Math.min(available, stingCycleDurationMs(overlay));
+}
+
+export function setStingPlaybackRate(
+  overlay: StingOverlay,
+  playbackRate: 1 | 2 | 3,
+  timelineOutMs: number,
+): StingOverlay {
+  const updated = { ...overlay, playbackRate };
+  if (stingRepeats(updated)) {
+    return {
+      ...updated,
+      endMs:
+        updated.startMs +
+        Math.min(
+          updated.endMs - updated.startMs,
+          maximumStingDurationMs(updated, timelineOutMs),
+        ),
+    };
+  }
+  return {
+    ...updated,
+    endMs:
+      updated.startMs +
+      Math.min(
+        stingCycleDurationMs(updated),
+        timelineOutMs - updated.startMs,
+      ),
+  };
+}
+
+export function setStingRepeat(
+  overlay: StingOverlay,
+  repeat: boolean,
+  timelineOutMs: number,
+): StingOverlay {
+  const updated = { ...overlay, repeat };
+  const cycleDurationMs = stingCycleDurationMs(updated);
+  const requestedDurationMs = repeat
+    ? Math.max(updated.endMs - updated.startMs, cycleDurationMs * 2)
+    : cycleDurationMs;
+  return {
+    ...updated,
+    endMs:
+      updated.startMs +
+      Math.min(
+        requestedDurationMs,
+        maximumStingDurationMs(updated, timelineOutMs),
+      ),
+  };
+}
+
+export function setStingDuration(
+  overlay: StingOverlay,
+  durationMs: number,
+  timelineOutMs: number,
+): StingOverlay {
+  return {
+    ...overlay,
+    endMs:
+      overlay.startMs +
+      Math.round(
+        clamp(
+          durationMs,
+          500,
+          maximumStingDurationMs(overlay, timelineOutMs),
+        ),
+      ),
   };
 }
 
@@ -286,10 +381,13 @@ export function replaceStingAsset(
   overlay: StingOverlay,
   asset: StingAssetRef,
 ): StingOverlay {
-  const maximumDuration = Math.floor(asset.durationMs / STING_PLAYBACK_RATE);
-  const endMs = Math.min(overlay.endMs, overlay.startMs + maximumDuration);
+  const updated = { ...overlay, asset };
+  const endMs = Math.min(
+    overlay.endMs,
+    overlay.startMs + maximumStingDurationMs(updated, Number.POSITIVE_INFINITY),
+  );
   return {
-    ...overlay,
+    ...updated,
     asset,
     includeAudio: overlay.includeAudio && asset.hasAudio,
     endMs,

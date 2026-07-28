@@ -6,6 +6,8 @@
     preview: StingPreviewRef;
     startMs: number;
     playheadMs: number;
+    playbackRate: 1 | 2 | 3;
+    repeat: boolean;
     onReady: () => void;
     onError: () => void;
   }
@@ -15,20 +17,26 @@
     preview,
     startMs,
     playheadMs,
+    playbackRate,
+    repeat,
     onReady,
     onError,
   }: Props = $props();
 
-  const frameIndex = $derived(
-    Math.min(
-      preview.frameCount - 1,
-      Math.max(
-        0,
-        Math.floor(
-          ((playheadMs - startMs) / 1_000) * preview.framesPerSecond,
-        ),
+  const rawFrameIndex = $derived(
+    Math.max(
+      0,
+      Math.floor(
+        ((playheadMs - startMs) / 1_000) *
+          preview.framesPerSecond *
+          (playbackRate / 3),
       ),
     ),
+  );
+  const frameIndex = $derived(
+    repeat
+      ? rawFrameIndex % preview.frameCount
+      : Math.min(preview.frameCount - 1, rawFrameIndex),
   );
   const column = $derived(frameIndex % preview.columns);
   const row = $derived(Math.floor(frameIndex / preview.columns));

@@ -195,9 +195,10 @@ Allow styled hook captions with:
 
 Captions are rasterized by the frontend to transparent PNG. User text is never inserted into an FFmpeg filter expression.
 
-### FR-007A — Constrained Skull’d sting
+### FR-007A — Constrained Skull’d stings
 
-Allow at most one user-selected MP4 sting with the fixed `toasty-right` preset.
+Allow up to eight user-selected MP4 stings with the constrained `toasty-right`
+preset.
 
 On import:
 
@@ -206,10 +207,14 @@ On import:
 - copy it into project assets and calculate SHA-256;
 - record duration, dimensions, MIME type, and audio presence.
 
-The preset owns the green chroma key, 3× playback, right-edge entrance/exit,
-and safe default placement. The user may move, resize, retime, rename, change
-opacity, and enable or disable verified sting audio. The frontend never supplies
-chroma-key values, playback expressions, filters, or FFmpeg arguments.
+The preset owns the green chroma key, right-edge entrance/exit, and safe default
+placement. The user may choose 1×, 2×, or 3× playback; play once or repeat to
+fill a duration of up to 60 seconds within the active clip; move, resize, retime,
+duplicate, rename, change opacity; and enable or disable verified sting audio.
+New stings default to 1× and play once. Legacy stings without the new fields
+remain 3× and play once. The frontend supplies only the validated enum and
+boolean project values, never chroma-key values, playback expressions, filters,
+or FFmpeg arguments.
 
 ### FR-008 — Preview
 

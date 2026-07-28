@@ -553,7 +553,7 @@ fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
         &ffmpeg,
         &source,
         "color=c=blue:size=640x360:rate=30",
-        "2",
+        "4",
         true,
         "libx264",
     );
@@ -565,13 +565,13 @@ fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
             "-f",
             "lavfi",
             "-i",
-            "color=c=0x06EE11:size=256x256:rate=30:duration=3,drawbox=x=80:y=80:w=96:h=96:color=red:t=fill",
+            "color=c=0x06EE11:size=256x256:rate=30:duration=1.5,drawbox=x=80:y=80:w=96:h=96:color=red:t=fill",
             "-f",
             "lavfi",
             "-i",
-            "sine=frequency=880:sample_rate=48000:duration=3",
+            "sine=frequency=880:sample_rate=48000:duration=1.5",
             "-t",
-            "3",
+            "1.5",
             "-c:v",
             "libx264",
             "-pix_fmt",
@@ -605,7 +605,7 @@ fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
             sting_asset.preview.height,
             sting_asset.preview.frame_count,
         ),
-        (768, 576, 12)
+        (576, 384, 6)
     );
     let preview_rgba = run(
         &ffmpeg,
@@ -625,38 +625,63 @@ fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
         ],
     )
     .stdout;
-    let transparent_offset = (10 * 768 + 10) * 4;
-    let subject_offset = (90 * 768 + 90) * 4;
+    let transparent_offset = (10 * 576 + 10) * 4;
+    let subject_offset = (90 * 576 + 90) * 4;
     assert!(preview_rgba[transparent_offset + 3] < 10);
     assert!(preview_rgba[subject_offset] > 180 && preview_rgba[subject_offset + 3] > 200);
     let mut project = project_for_source(&source, &source_probe);
-    project.timeline.out_ms = 2_000;
-    project.overlays = vec![Overlay::Sting {
-        base: OverlayBase {
-            id: Uuid::new_v4().to_string(),
-            name: "Skull'd sting".to_owned(),
-            position: NormalizedRect {
-                x: 0.5,
-                y: 0.5,
-                width: 0.25,
-                height: 0.140_625,
+    project.timeline.out_ms = 4_000;
+    project.overlays = vec![
+        Overlay::Sting {
+            base: OverlayBase {
+                id: Uuid::new_v4().to_string(),
+                name: "Repeating Skull'd sting".to_owned(),
+                position: NormalizedRect {
+                    x: 0.5,
+                    y: 0.5,
+                    width: 0.25,
+                    height: 0.140_625,
+                },
+                opacity: 1.0,
+                start_ms: 500,
+                end_ms: 3_500,
+                z_index: 0,
             },
-            opacity: 1.0,
-            start_ms: 500,
-            end_ms: 1_500,
-            z_index: 0,
+            asset: sting_asset.clone(),
+            preset: StingPreset::ToastyRight,
+            include_audio: true,
+            playback_rate: Some(1),
+            repeat: Some(true),
         },
-        asset: sting_asset,
-        preset: StingPreset::ToastyRight,
-        include_audio: true,
-    }];
+        Overlay::Sting {
+            base: OverlayBase {
+                id: Uuid::new_v4().to_string(),
+                name: "Second Skull'd sting".to_owned(),
+                position: NormalizedRect {
+                    x: 0.1,
+                    y: 0.1,
+                    width: 0.2,
+                    height: 0.112_5,
+                },
+                opacity: 1.0,
+                start_ms: 2_500,
+                end_ms: 3_250,
+                z_index: 1,
+            },
+            asset: sting_asset,
+            preset: StingPreset::ToastyRight,
+            include_audio: true,
+            playback_rate: Some(2),
+            repeat: Some(false),
+        },
+    ];
     project.validate().unwrap();
     assets::validate_project_assets(&project_path, &project, true).unwrap();
 
     let args = build_ffmpeg_args(
         &project,
         &project.export_defaults,
-        &[&stored_sting],
+        &[&stored_sting, &stored_sting],
         &output,
         false,
     )
@@ -692,9 +717,11 @@ fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
         .stdout
     };
     let active = frame_at("1.0");
-    let after = frame_at("1.7");
+    let repeated = frame_at("2.3");
+    let after = frame_at("3.7");
     let keyed_background = rgb_at(&active, 1080, 550, 970);
     let sting_subject = rgb_at(&active, 1080, 675, 1_095);
+    let repeated_subject = rgb_at(&repeated, 1080, 675, 1_095);
     let cleared_subject = rgb_at(&after, 1080, 675, 1_095);
     assert!(
         keyed_background[2] > 200 && keyed_background[0] < 50 && keyed_background[1] < 50,
@@ -703,6 +730,10 @@ fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
     assert!(
         sting_subject[0] > 180 && sting_subject[1] < 80 && sting_subject[2] < 80,
         "sting subject was {sting_subject:?}"
+    );
+    assert!(
+        repeated_subject[0] > 180 && repeated_subject[1] < 80 && repeated_subject[2] < 80,
+        "repeating sting subject was {repeated_subject:?}"
     );
     assert!(
         cleared_subject[2] > 200 && cleared_subject[0] < 50 && cleared_subject[1] < 50,

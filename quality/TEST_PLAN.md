@@ -17,7 +17,7 @@
 - trim controls;
 - crop inspector/stage synchronization;
 - overlay selection/timing;
-- constrained sting selection/audio/timing;
+- bounded multi-sting selection, 1×/2×/3× timing, repeat, audio and duration;
 - export validation;
 - cancellation UI;
 - relink flow.

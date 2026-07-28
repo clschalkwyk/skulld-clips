@@ -39,3 +39,4 @@ SCF-057,M6,Sting placement controls,0.5,SCF-056,"Visible selection, anchors, sli
 SCF-058,M6,Source-fitted preview stage,0.25,SCF-057,"Top-aligned preview without redundant letterbox bands"
 SCF-059,M6,Viewport-contained editor,0.25,SCF-058,"Pinned timeline with independently scrolling workspace panels"
 SCF-060,M6,Canvas dock editor layout,1.0,SCF-059,"Full-width rail, compact overlay dock and relative timing"
+SCF-061,M6,Variable and repeating Skull'd stings,1.5,SCF-060,"Up to eight stings with 1x/2x/3x once/repeat preview and export parity"

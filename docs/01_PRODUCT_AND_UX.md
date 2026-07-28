@@ -172,7 +172,10 @@ Image properties:
 Skull’d sting properties:
 
 - replace MP4;
-- fixed `toasty-right` motion preset;
+- constrained `toasty-right` motion preset;
+- choose 1×, 2×, or 3× playback;
+- play once or repeat to fill the selected duration;
+- duplicate a sting without importing the same asset again;
 - include verified clip audio;
 - reset to the bottom-right safe placement;
 - choose one of nine safe-area anchors;
@@ -183,11 +186,13 @@ Skull’d sting properties:
 - adjust left and top under advanced controls;
 - reveal exact normalized placement and timing values only on demand.
 
-Only one sting is supported. Rust generates a bounded transparent PNG sprite
-with the fixed green-screen key for local preview; export remains authoritative
-and is covered by golden-frame tolerance. Selecting a sting moves the playhead
-to a stable visible frame when the current playhead is outside its settled
-interval, so placement changes are immediately visible.
+Up to eight stings are supported. A repeating sting is limited to 60 seconds and
+the active clip range. Rust generates a bounded transparent PNG sprite with the
+fixed green-screen key for local preview; the frontend advances or loops that
+sprite at the selected playback rate. Export remains authoritative and is
+covered by golden-frame tolerance. Selecting a sting moves the playhead to a
+stable visible frame when the current playhead is outside its settled interval,
+so placement changes are immediately visible.
 
 Caption properties:
 

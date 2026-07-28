@@ -41,4 +41,5 @@
 - Overlay timing remains integer milliseconds in the project contract.
 - Overlay coordinates remain normalized and continue through the existing pure
   coordinate mapper.
-- The fixed sting speed, keying, duration ceiling, and audio flag remain unchanged.
+- SCF-060 left sting behavior unchanged. SCF-061 subsequently added bounded
+  rate/repeat/duration fields while preserving fixed keying and the audio flag.

@@ -27,6 +27,8 @@
     overlayAsset,
     resizeOverlay,
     stingDisplayX,
+    stingPlaybackRate,
+    stingRepeats,
   } from "../../services/overlay-model";
   import { projectAssetPreviewUrl } from "../../services/tauri";
 
@@ -396,6 +398,8 @@
             preview={overlay.asset.preview}
             startMs={overlay.startMs}
             {playheadMs}
+            playbackRate={stingPlaybackRate(overlay)}
+            repeat={stingRepeats(overlay)}
             onReady={() => onPreviewError(null)}
             onError={() =>
               onPreviewError("The generated Skull'd sting preview could not be displayed.")}

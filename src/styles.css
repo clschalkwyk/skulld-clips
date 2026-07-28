@@ -1014,6 +1014,14 @@ footer {
   gap: 8px;
 }
 
+.placement-primary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+}
+
 .placement-tool {
   min-width: 0;
   display: grid;
@@ -1170,6 +1178,86 @@ footer {
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sting-duration-control {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sting-duration-control input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #38383d;
+  border-radius: 0;
+  padding: 5px 6px;
+  color: #f4f0e8;
+  background: #0e0d10;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+}
+
+.sting-duration-control > span {
+  color: #8f8982;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sting-playback-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 8px;
+}
+
+.sting-playback-row fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.sting-playback-row legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: #7c7670;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sting-segmented-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sting-speed-control {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sting-segmented-control button {
+  min-width: 0;
+  border: 1px solid #38383d;
+  padding: 6px 4px;
+  color: #8f8982;
+  background: #0e0d10;
+  font-size: 9px;
+}
+
+.sting-segmented-control button + button {
+  border-left: 0;
+}
+
+.sting-segmented-control button.active {
+  border-color: #72d6a0;
+  color: #d7f6e4;
+  background: rgb(114 214 160 / 9%);
 }
 
 .relative-timing-track {

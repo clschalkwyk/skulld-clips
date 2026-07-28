@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Overlay } from "../../../contracts/types";
+  import { MAX_STING_OVERLAYS } from "../../services/overlay-model";
 
   interface Props {
     overlays: Overlay[];
@@ -30,7 +31,10 @@
   const orderedOverlays = $derived(
     [...overlays].sort((a, b) => b.zIndex - a.zIndex),
   );
-  const hasSting = $derived(overlays.some((overlay) => overlay.type === "sting"));
+  const stingCount = $derived(
+    overlays.filter((overlay) => overlay.type === "sting").length,
+  );
+  const stingLimitReached = $derived(stingCount >= MAX_STING_OVERLAYS);
 
   async function createCaption(): Promise<void> {
     if (!captionText.trim() || addingCaption) {
@@ -79,9 +83,9 @@
   <button
     type="button"
     class="rail-item"
-    disabled={busy || hasSting}
-    aria-label={hasSting ? "Skull’d sting already added" : "Add Skull’d sting"}
-    title={hasSting ? "Skull’d sting already added" : "Add Skull’d sting"}
+    disabled={busy || stingLimitReached}
+    aria-label={stingLimitReached ? "Eight-sting limit reached" : "Add Skull’d sting"}
+    title={stingLimitReached ? "Eight-sting limit reached" : "Add Skull’d sting"}
     onclick={onAddSting}
   >
     <span class="rail-glyph">STG</span>

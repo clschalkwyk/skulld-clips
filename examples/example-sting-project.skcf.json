@@ -94,7 +94,9 @@
         }
       },
       "preset": "toasty-right",
-      "includeAudio": true
+      "includeAudio": true,
+      "playbackRate": 3,
+      "repeat": false
     }
   ],
   "exportDefaults": {

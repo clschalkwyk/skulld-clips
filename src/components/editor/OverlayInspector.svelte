@@ -6,11 +6,17 @@
   } from "../../../contracts/types";
   import {
     anchorOverlay,
+    maximumStingDurationMs,
     nudgeOverlay,
     overlayAsset,
     resetOverlayPosition,
     resetStingPosition,
     resizeOverlay,
+    setStingDuration,
+    setStingPlaybackRate,
+    setStingRepeat,
+    stingPlaybackRate,
+    stingRepeats,
     type OverlayAnchor,
   } from "../../services/overlay-model";
   import {
@@ -31,6 +37,7 @@
     onCaptionChange: (id: string, caption: CaptionStyle) => void;
     onReplaceImage: (id: string) => Promise<void>;
     onReplaceSting: (id: string) => Promise<void>;
+    onDuplicateSting: (id: string) => void;
     onReorder: (id: string, direction: -1 | 1) => void;
     onDelete: (id: string) => void;
   }
@@ -46,6 +53,7 @@
     onCaptionChange,
     onReplaceImage,
     onReplaceSting,
+    onDuplicateSting,
     onReorder,
     onDelete,
   }: Props = $props();
@@ -151,10 +159,7 @@
     const minimumDuration = overlay.type === "sting" ? 500 : 1;
     const maximumEnd =
       overlay.type === "sting"
-        ? Math.min(
-            timelineOutMs,
-            overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
-          )
+        ? overlay.startMs + maximumStingDurationMs(overlay, timelineOutMs)
         : timelineOutMs;
     onChange({
       ...overlay,
@@ -168,7 +173,7 @@
     const minimumDurationMs = overlay.type === "sting" ? 500 : 1;
     const maximumDurationMs =
       overlay.type === "sting"
-        ? Math.floor(overlay.asset.durationMs / 3)
+        ? maximumStingDurationMs(overlay, timelineOutMs)
         : Number.POSITIVE_INFINITY;
     const range = placeOverlayStartAtPlayhead(
       playheadMs,
@@ -186,7 +191,7 @@
     const minimumDurationMs = overlay.type === "sting" ? 500 : 1;
     const maximumDurationMs =
       overlay.type === "sting"
-        ? Math.floor(overlay.asset.durationMs / 3)
+        ? maximumStingDurationMs(overlay, timelineOutMs)
         : Number.POSITIVE_INFINITY;
     const range = placeOverlayEndAtPlayhead(
       playheadMs,
@@ -263,43 +268,45 @@
       </button>
     </div>
 
-    <div class="placement-workbench">
-      <div class="placement-tool">
-        <span class="control-label">Anchor position</span>
-        <div class="anchor-grid anchor-grid-primary" aria-label="Overlay anchor positions">
-          {#each anchors as anchor (anchor.id)}
-            <button
-              type="button"
-              class:active={isAtAnchor(anchor.id)}
-              aria-label={`Place overlay ${anchor.label.toLowerCase()}`}
-              aria-pressed={isAtAnchor(anchor.id)}
-              disabled={disabled}
-              title={anchor.label}
-              onclick={() => applyAnchor(anchor.id)}
-            >
-              {anchor.glyph}
-            </button>
-          {/each}
+    <div class="placement-primary">
+      <div class="placement-workbench">
+        <div class="placement-tool">
+          <span class="control-label">Anchor position</span>
+          <div class="anchor-grid anchor-grid-primary" aria-label="Overlay anchor positions">
+            {#each anchors as anchor (anchor.id)}
+              <button
+                type="button"
+                class:active={isAtAnchor(anchor.id)}
+                aria-label={`Place overlay ${anchor.label.toLowerCase()}`}
+                aria-pressed={isAtAnchor(anchor.id)}
+                disabled={disabled}
+                title={anchor.label}
+                onclick={() => applyAnchor(anchor.id)}
+              >
+                {anchor.glyph}
+              </button>
+            {/each}
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="placement-sliders primary-size-control">
-      <label>
-        <span>
-          Size
-          <strong>{Math.round(overlay.position.width * 1080)} px</strong>
-        </span>
-        <input
-          type="range"
-          min={32 / 1080}
-          max="1"
-          step={1 / 1080}
-          value={overlay.position.width}
-          disabled={disabled}
-          oninput={(event) => updateWidth(numberValue(event))}
-        />
-      </label>
+      <div class="placement-sliders primary-size-control">
+        <label>
+          <span>
+            Size
+            <strong>{Math.round(overlay.position.width * 1080)} px</strong>
+          </span>
+          <input
+            type="range"
+            min={32 / 1080}
+            max="1"
+            step={1 / 1080}
+            value={overlay.position.width}
+            disabled={disabled}
+            oninput={(event) => updateWidth(numberValue(event))}
+          />
+        </label>
+      </div>
     </div>
   </div>
 
@@ -321,9 +328,82 @@
       </div>
       <div>
         <span>Duration</span>
-        <strong>{formatRelativeSeconds(timing.durationMs)}</strong>
+        {#if overlay.type === "sting"}
+          <label class="sting-duration-control">
+            <input
+              type="number"
+              min="0.5"
+              max={maximumStingDurationMs(overlay, timelineOutMs) / 1_000}
+              step="0.1"
+              value={(timing.durationMs / 1_000).toFixed(2)}
+              disabled={disabled}
+              aria-label="Sting duration in seconds"
+              onchange={(event) =>
+                onChange(
+                  setStingDuration(
+                    overlay,
+                    numberValue(event) * 1_000,
+                    timelineOutMs,
+                  ),
+                )}
+            />
+            <span>s</span>
+          </label>
+        {:else}
+          <strong>{formatRelativeSeconds(timing.durationMs)}</strong>
+        {/if}
       </div>
     </div>
+    {#if overlay.type === "sting"}
+      <div class="sting-playback-row">
+        <fieldset>
+          <legend>Speed</legend>
+          <div class="sting-segmented-control sting-speed-control">
+            {#each [1, 2, 3] as playbackRate (playbackRate)}
+              <button
+                type="button"
+                class:active={stingPlaybackRate(overlay) === playbackRate}
+                aria-pressed={stingPlaybackRate(overlay) === playbackRate}
+                disabled={disabled}
+                onclick={() =>
+                  onChange(
+                    setStingPlaybackRate(
+                      overlay,
+                      playbackRate as 1 | 2 | 3,
+                      timelineOutMs,
+                    ),
+                  )}
+              >
+                {playbackRate}×
+              </button>
+            {/each}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Playback</legend>
+          <div class="sting-segmented-control">
+            <button
+              type="button"
+              class:active={!stingRepeats(overlay)}
+              aria-pressed={!stingRepeats(overlay)}
+              disabled={disabled}
+              onclick={() => onChange(setStingRepeat(overlay, false, timelineOutMs))}
+            >
+              Once
+            </button>
+            <button
+              type="button"
+              class:active={stingRepeats(overlay)}
+              aria-pressed={stingRepeats(overlay)}
+              disabled={disabled}
+              onclick={() => onChange(setStingRepeat(overlay, true, timelineOutMs))}
+            >
+              Repeat
+            </button>
+          </div>
+        </fieldset>
+      </div>
+    {/if}
     <div class="relative-timing-track" aria-label="Overlay position within selected clip">
       <span style={timingBarStyle}></span>
     </div>
@@ -519,10 +599,7 @@
               type="number"
               min={overlay.startMs + (overlay.type === "sting" ? 500 : 1)}
               max={overlay.type === "sting"
-                ? Math.min(
-                    timelineOutMs,
-                    overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
-                  )
+                ? overlay.startMs + maximumStingDurationMs(overlay, timelineOutMs)
                 : timelineOutMs}
               step="1"
               value={overlay.endMs}
@@ -719,6 +796,9 @@
     {/if}
   {:else}
     <div class="asset-actions">
+      <button type="button" disabled={disabled} onclick={() => onDuplicateSting(overlay.id)}>
+        Duplicate sting
+      </button>
       <button type="button" disabled={disabled} onclick={() => onReplaceSting(overlay.id)}>
         Replace sting MP4
       </button>
@@ -737,7 +817,8 @@
       <span>Include sting audio</span>
     </label>
     <p class="asset-note">
-      Toasty-right · 3× speed · fixed green key<br />
+      Toasty-right · {stingPlaybackRate(overlay)}× ·
+      {stingRepeats(overlay) ? "repeat" : "once"} · fixed green key<br />
       {overlay.asset.width} × {overlay.asset.height} ·
       {(overlay.asset.durationMs / 1_000).toFixed(2)} seconds ·
       {overlay.asset.hasAudio ? "audio detected" : "silent"}

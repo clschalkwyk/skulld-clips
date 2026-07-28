@@ -694,6 +694,19 @@
             },
             "includeAudio": {
               "type": "boolean"
+            },
+            "playbackRate": {
+              "type": "integer",
+              "enum": [
+                1,
+                2,
+                3
+              ],
+              "default": 3
+            },
+            "repeat": {
+              "type": "boolean",
+              "default": false
             }
           }
         }

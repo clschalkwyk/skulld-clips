@@ -31,6 +31,8 @@
     createImageOverlay,
     createStingOverlay,
     DEFAULT_CAPTION_STYLE,
+    MAX_STING_OVERLAYS,
+    maximumStingDurationMs,
     nextZIndex,
     reorderOverlay,
     replaceOverlayAsset,
@@ -573,11 +575,14 @@
     if (!session || session.sourceStatus !== "ok" || overlayBusy) {
       return;
     }
-    if (session.project.overlays.some((overlay) => overlay.type === "sting")) {
+    const stingCount = session.project.overlays.filter(
+      (overlay) => overlay.type === "sting",
+    ).length;
+    if (stingCount >= MAX_STING_OVERLAYS) {
       actionError = {
         code: "E_INVALID_ARGUMENT",
-        message: "This project already has a Skull'd sting.",
-        safeDetail: "Select the sting layer to replace or retime it.",
+        message: "This project has reached the eight-sting limit.",
+        safeDetail: "Remove an existing sting before adding another.",
         retryable: false,
       };
       return;
@@ -661,6 +666,49 @@
     } finally {
       overlayBusy = false;
     }
+  }
+
+  function duplicateStingOverlay(id: string): void {
+    if (!session) {
+      return;
+    }
+    const stingCount = session.project.overlays.filter(
+      (overlay) => overlay.type === "sting",
+    ).length;
+    if (stingCount >= MAX_STING_OVERLAYS) {
+      actionError = {
+        code: "E_INVALID_ARGUMENT",
+        message: "This project has reached the eight-sting limit.",
+        safeDetail: "Remove an existing sting before duplicating it.",
+        retryable: false,
+      };
+      return;
+    }
+    const source = session.project.overlays.find(
+      (overlay) => overlay.id === id && overlay.type === "sting",
+    );
+    if (!source || source.type !== "sting") {
+      return;
+    }
+    const { inMs, outMs } = session.project.timeline;
+    const durationMs = source.endMs - source.startMs;
+    const startMs = Math.max(
+      inMs,
+      Math.min(source.endMs + 250, outMs - durationMs),
+    );
+    const duplicate: typeof source = {
+      ...source,
+      id: crypto.randomUUID(),
+      name: `${source.name.slice(0, 115)} copy`,
+      position: { ...source.position },
+      startMs,
+      endMs: startMs + durationMs,
+      zIndex: nextZIndex(session.project.overlays),
+    };
+    session.project.overlays.push(duplicate);
+    selectOverlay(duplicate.id);
+    actionError = null;
+    markProjectDirty();
   }
 
   function deleteOverlay(id: string): void {
@@ -840,7 +888,11 @@
       );
       const maximumEnd =
         overlay.type === "sting"
-          ? Math.min(outMs, start + Math.floor(overlay.asset.durationMs / 3))
+          ? start +
+            maximumStingDurationMs(
+              { ...overlay, startMs: start },
+              outMs,
+            )
           : outMs;
       const end = Math.min(
         maximumEnd,
@@ -1251,6 +1303,7 @@
             onCaptionChange={updateCaptionOverlay}
             onReplaceImage={replaceImageOverlay}
             onReplaceSting={replaceStingOverlay}
+            onDuplicateSting={duplicateStingOverlay}
             onReorder={moveOverlayInStack}
             onDelete={deleteOverlay}
           />

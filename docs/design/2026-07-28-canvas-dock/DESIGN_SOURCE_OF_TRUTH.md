@@ -36,8 +36,9 @@
 - Provide **Start at playhead** and **End at playhead** actions.
 - Keep absolute coordinates, opacity, stacking, nudge distance, and absolute
   millisecond values available under collapsed advanced controls.
-- Preserve the fixed Toasty-right, 3x-speed sting behavior. This work changes the
-  editor presentation, not the media contract.
+- SCF-060 originally preserved the fixed Toasty-right 3x behavior. SCF-061
+  supersedes that product constraint with 1x/2x/3x and once/repeat controls
+  while keeping the fixed key and entrance/exit preset.
 
 ## Responsive behavior
 

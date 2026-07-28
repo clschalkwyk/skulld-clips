@@ -27,16 +27,18 @@ Feature: Build a branded vertical gameplay clip
     And a video stream exists
     And absence of audio is accepted
 
-  Scenario: Constrained Skull'd sting
+  Scenario: Constrained Skull'd stings
     Given I import a valid green-screen MP4 sting
-    And I place it inside the active range
-    And selecting it reveals a settled visible frame
-    And I can anchor, nudge, resize, or drag it within the output bounds
+    And I place a 1 times repeating sting inside the active range
+    And I duplicate it as a 2 times sting that plays once
+    And selecting either sting reveals a settled visible frame
+    And I can anchor, nudge, resize, or drag either within the output bounds
     When I export using the Toasty-right preset with sting audio enabled
-    Then the sting enters from the right at 3 times source speed
-    And its green background is keyed out
-    And its audio is mixed without clipping
-    And no frozen sting frame remains after its end time
+    Then both stings enter from the right at their selected source speeds
+    And the repeating sting fills its selected duration
+    And their green backgrounds are keyed out
+    And their audio is mixed without clipping
+    And no frozen sting frame remains after either end time
 
   Scenario: Preview uses the available editor space efficiently
     Given I opened a project with a verified source
@@ -52,6 +54,7 @@ Feature: Build a branded vertical gameplay clip
     And the timeline starts after the layer rail below the preview and dock
     And the dock shows nine placement anchors and a size control
     And the dock shows the sting start offset and duration relative to clip in
+    And the dock shows speed, once or repeat, and editable duration
     When I set the sting start and end from the playhead
     Then its integer millisecond timing remains within the active range
     And exact placement and timing values remain available under advanced controls

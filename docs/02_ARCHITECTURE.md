@@ -118,9 +118,11 @@ Allowed paths are:
 
 Canonicalize where possible. Project-relative assets may not escape project root through `..`, symlink or crafted JSON.
 
-The optional sting is a constrained asset type rather than a general video
-track. Rust fixes its chroma key, 3× playback, entrance/exit motion and audio
-mix graph. Svelte may select the preset and audio inclusion only.
+Each optional sting is a constrained asset type rather than a general video
+track. A project may contain up to eight. Rust fixes the chroma key,
+entrance/exit motion and bounded audio mix graph, and turns the validated
+1×/2×/3× and once/repeat values into FFmpeg arguments. Svelte may edit only
+those project fields, placement, timing, opacity and audio inclusion.
 
 ## Sidecar layout
 

@@ -10,6 +10,11 @@ import {
   nudgeOverlay,
   reorderOverlay,
   resizeOverlay,
+  setStingDuration,
+  setStingPlaybackRate,
+  setStingRepeat,
+  stingPlaybackRate,
+  stingRepeats,
   stingDisplayX,
 } from "./overlay-model";
 
@@ -130,7 +135,7 @@ describe("overlay model", () => {
     ]);
   });
 
-  it("creates the fixed Toasty-right sting and computes its entrance and exit", () => {
+  it("creates a normal-speed Toasty-right sting and computes its entrance and exit", () => {
     const overlay = createStingOverlay(
       "00000000-0000-4000-8000-000000000001",
       stingAsset,
@@ -140,7 +145,9 @@ describe("overlay model", () => {
     );
 
     expect(overlay.startMs).toBe(3_000);
-    expect(overlay.endMs).toBe(4_680);
+    expect(overlay.endMs).toBe(8_042);
+    expect(overlay.playbackRate).toBe(1);
+    expect(overlay.repeat).toBe(false);
     expect(overlay.position).toEqual({
       x: 0.57037,
       y: 0.729167,
@@ -149,6 +156,44 @@ describe("overlay model", () => {
     });
     expect(stingDisplayX(overlay, 3_000)).toBe(1);
     expect(stingDisplayX(overlay, 3_180)).toBeCloseTo(overlay.position.x);
-    expect(stingDisplayX(overlay, 4_680)).toBe(1);
+    expect(stingDisplayX(overlay, 8_042)).toBe(1);
+  });
+
+  it("keeps legacy stings at 3x until the user changes them", () => {
+    const legacy = createStingOverlay(
+      "00000000-0000-4000-8000-000000000001",
+      stingAsset,
+      1_000,
+      10_000,
+      2,
+    );
+    delete legacy.playbackRate;
+    delete legacy.repeat;
+
+    expect(stingPlaybackRate(legacy)).toBe(3);
+    expect(stingRepeats(legacy)).toBe(false);
+  });
+
+  it("changes speed, repeat mode, and bounded duration", () => {
+    const initial = createStingOverlay(
+      "00000000-0000-4000-8000-000000000001",
+      stingAsset,
+      1_000,
+      20_000,
+      2,
+    );
+    const faster = setStingPlaybackRate(initial, 2, 20_000);
+    expect(faster.endMs - faster.startMs).toBe(2_521);
+
+    const repeating = setStingRepeat(faster, true, 20_000);
+    expect(repeating.repeat).toBe(true);
+    expect(repeating.endMs - repeating.startMs).toBe(5_042);
+
+    const extended = setStingDuration(repeating, 12_000, 20_000);
+    expect(extended.endMs - extended.startMs).toBe(12_000);
+
+    const once = setStingRepeat(extended, false, 20_000);
+    expect(once.repeat).toBe(false);
+    expect(once.endMs - once.startMs).toBe(2_521);
   });
 });

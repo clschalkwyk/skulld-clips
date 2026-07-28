@@ -151,15 +151,19 @@ The `toasty-right` preset is generated entirely by Rust:
 
 - input MP4 is project-owned, content-addressed and pre-probed;
 - import creates a bounded 12 fps transparent PNG sprite for preview;
-- video is trimmed to the overlay window and played at 3×;
+- video is played at the validated 1×, 2×, or 3× rate;
+- a repeating input loops only long enough to fill its validated overlay window;
 - `chromakey` uses the fixed captured-green profile;
 - the keyed frame is scaled through the output-canvas coordinate mapper;
 - x position enters from the right over 180 ms and exits over 120 ms;
 - `eof_action=pass` and `repeatlast=0` prevent a frozen final frame;
-- optional clip audio uses matching 3× tempo, is delayed to the overlay start,
-  mixed with bounded source ducking and limited before AAC encoding.
+- optional clip audio uses the matching validated tempo, is delayed to the
+  overlay start, mixed with every other enabled sting through bounded source
+  ducking and limited before AAC encoding.
 
-Only one sting is accepted in a project. No key colour, similarity, blend,
+Up to eight stings are accepted in a project. Repeating windows are limited to
+60 seconds and the active clip. New stings default to 1×/once; missing fields in
+legacy projects retain 3×/once behavior. No key colour, similarity, blend,
 playback expression, filter expression or raw media argument crosses the
 frontend boundary.
 

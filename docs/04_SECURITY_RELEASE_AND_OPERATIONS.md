@@ -17,7 +17,7 @@ Assets:
 | Frontend process execution | No shell capability; Rust fixed commands |
 | Path traversal | Canonicalization and containment |
 | Command injection | Argument arrays; rasterized text |
-| Crafted animated overlay | One bounded MP4 sting; fixed Rust-owned key/motion/audio graph |
+| Crafted animated overlay | Up to eight bounded MP4 stings; validated rate/repeat fields and fixed Rust-owned key/motion/audio graph |
 | Accidental overwrite | Explicit confirmation |
 | Corrupt output reported as success | Partial file + ffprobe + atomic rename |
 | Private path leakage | Logging redaction |

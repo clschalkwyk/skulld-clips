@@ -12,6 +12,8 @@ use crate::domain::{AppError, MediaProbe};
 pub const PROJECT_SCHEMA_VERSION: u32 = 1;
 pub const PROJECT_FILENAME: &str = "project.skcf.json";
 pub const MIN_TRIM_DURATION_MS: u64 = 250;
+pub const MAX_STING_OVERLAYS: usize = 8;
+pub const MAX_STING_REPEAT_DURATION_MS: u64 = 60_000;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -125,6 +127,14 @@ pub enum Overlay {
         preset: StingPreset,
         #[serde(rename = "includeAudio")]
         include_audio: bool,
+        #[serde(
+            default,
+            rename = "playbackRate",
+            skip_serializing_if = "Option::is_none"
+        )]
+        playback_rate: Option<u8>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        repeat: Option<bool>,
     },
 }
 
@@ -156,6 +166,23 @@ impl Overlay {
             } => Some((asset, *include_audio)),
             Self::Image { .. } | Self::Caption { .. } => None,
         }
+    }
+
+    pub fn sting_playback_rate(&self) -> Option<u8> {
+        match self {
+            Self::Sting { playback_rate, .. } => Some(playback_rate.unwrap_or(3)),
+            Self::Image { .. } | Self::Caption { .. } => None,
+        }
+    }
+
+    pub fn sting_repeats(&self) -> bool {
+        matches!(
+            self,
+            Self::Sting {
+                repeat: Some(true),
+                ..
+            }
+        )
     }
 }
 
@@ -333,7 +360,7 @@ impl ProjectV1 {
             ));
         }
         let mut overlay_ids = HashSet::with_capacity(self.overlays.len());
-        let mut sting_count = 0_u8;
+        let mut sting_count = 0_usize;
         for overlay in &self.overlays {
             validate_overlay(overlay, self.timeline.in_ms, self.timeline.out_ms)?;
             let id = match overlay {
@@ -350,9 +377,9 @@ impl ProjectV1 {
                 sting_count += 1;
             }
         }
-        if sting_count > 1 {
+        if sting_count > MAX_STING_OVERLAYS {
             return Err(AppError::invalid_argument(
-                "A project may contain at most one Skull'd sting.",
+                "A project may contain at most eight Skull'd stings.",
             ));
         }
         validate_export_settings(&self.export_defaults)
@@ -497,9 +524,17 @@ fn validate_overlay(
             base,
             asset,
             include_audio,
+            playback_rate,
+            repeat,
             ..
         } => {
-            validate_sting(asset, base, *include_audio)?;
+            validate_sting(
+                asset,
+                base,
+                *include_audio,
+                playback_rate.unwrap_or(3),
+                repeat.unwrap_or(false),
+            )?;
             (base, &asset.asset, "assets/stings", Some("video/mp4"))
         }
     };
@@ -534,20 +569,28 @@ fn validate_sting(
     asset: &StingAssetRef,
     base: &OverlayBase,
     include_audio: bool,
+    playback_rate: u8,
+    repeat: bool,
 ) -> Result<(), AppError> {
     let overlay_duration = base.end_ms.saturating_sub(base.start_ms);
-    let available_duration = asset.duration_ms.div_ceil(3);
+    let available_duration = asset.duration_ms / u64::from(playback_rate.max(1));
+    let duration_valid = if repeat {
+        overlay_duration <= MAX_STING_REPEAT_DURATION_MS
+    } else {
+        overlay_duration <= available_duration
+    };
     let aspect_ratio = f64::from(asset.asset.width) / f64::from(asset.asset.height);
     if !(1_500..=10_000).contains(&asset.duration_ms)
         || asset.asset.width > 4096
         || asset.asset.height > 4096
         || !(0.9..=1.1).contains(&aspect_ratio)
+        || !matches!(playback_rate, 1..=3)
         || overlay_duration < 500
-        || overlay_duration > available_duration
+        || !duration_valid
         || (include_audio && !asset.has_audio)
     {
         return Err(AppError::invalid_argument(
-            "The Skull'd sting must fit its probed media and fixed Toasty-right preset.",
+            "The Skull'd sting speed, repeat mode, duration, audio and asset must remain within the bounded Toasty-right contract.",
         ));
     }
     let preview = &asset.preview;
@@ -661,7 +704,7 @@ fn round_six(value: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{centered_crop, NormalizedRect, ProjectV1};
+    use super::{centered_crop, NormalizedRect, Overlay, ProjectV1};
     use crate::domain::{MediaProbe, VideoProbe};
 
     fn probe(width: u32, height: u32) -> MediaProbe {
@@ -729,5 +772,39 @@ mod tests {
         ))
         .unwrap();
         project.validate().unwrap();
+    }
+
+    #[test]
+    fn legacy_stings_remain_three_times_once_and_projects_allow_up_to_eight() {
+        let mut value: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../examples/example-sting-project.skcf.json"
+        ))
+        .unwrap();
+        let sting = value["overlays"][0].as_object_mut().unwrap();
+        sting.remove("playbackRate");
+        sting.remove("repeat");
+
+        let mut project: ProjectV1 = serde_json::from_value(value).unwrap();
+        assert_eq!(project.overlays[0].sting_playback_rate(), Some(3));
+        assert!(!project.overlays[0].sting_repeats());
+        let serialized = serde_json::to_value(&project).unwrap();
+        assert!(serialized["overlays"][0].get("playbackRate").is_none());
+        assert!(serialized["overlays"][0].get("repeat").is_none());
+
+        for index in 1..8 {
+            let mut overlay = project.overlays[0].clone();
+            if let Overlay::Sting { base, .. } = &mut overlay {
+                base.id = format!("00000000-0000-4000-8000-{index:012}");
+            }
+            project.overlays.push(overlay);
+        }
+        project.validate().unwrap();
+
+        let mut ninth = project.overlays[0].clone();
+        if let Overlay::Sting { base, .. } = &mut ninth {
+            base.id = "00000000-0000-4000-8000-000000000009".to_owned();
+        }
+        project.overlays.push(ninth);
+        assert!(project.validate().is_err());
     }
 }

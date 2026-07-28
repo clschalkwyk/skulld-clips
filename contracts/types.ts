@@ -117,6 +117,8 @@ export interface StingOverlay extends OverlayBase {
   asset: StingAssetRef;
   preset: "toasty-right";
   includeAudio: boolean;
+  playbackRate?: 1 | 2 | 3;
+  repeat?: boolean;
 }
 
 export type Overlay = ImageOverlay | CaptionOverlay | StingOverlay;

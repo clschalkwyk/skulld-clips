@@ -21,7 +21,8 @@ slice. This is a layout and control-presentation change only.
 - Project schema or contracts.
 - Tauri command/event names or payloads.
 - Rust media pipeline or FFmpeg argument construction.
-- Fixed Toasty-right speed and keying behavior.
+- Fixed Toasty-right speed and keying behavior for SCF-060. SCF-061 supersedes
+  the fixed-speed constraint but retains the fixed keying behavior.
 - Autosave, relink, export, cancellation, or diagnostics behavior.
 
 ## Verification

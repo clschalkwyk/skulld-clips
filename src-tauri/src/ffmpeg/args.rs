@@ -31,7 +31,11 @@ pub fn build_ffmpeg_args(
         project.source.path.as_str().into(),
     ];
     for (overlay, asset) in ordered_overlays(project).into_iter().zip(asset_paths) {
-        if !matches!(overlay, Overlay::Sting { .. }) {
+        if matches!(overlay, Overlay::Sting { .. }) {
+            if overlay.sting_repeats() {
+                args.extend(["-stream_loop".into(), "-1".into()]);
+            }
+        } else {
             args.extend(["-loop".into(), "1".into(), "-framerate".into(), "1".into()]);
         }
         args.extend(["-i".into(), asset.as_ref().as_os_str().to_owned()]);
