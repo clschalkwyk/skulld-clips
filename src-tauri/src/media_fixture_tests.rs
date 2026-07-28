@@ -111,7 +111,13 @@ fn export_fixture(ffmpeg: &Path, project: &ProjectV1, output: &Path) {
         "fixture export failed: {}",
         String::from_utf8_lossy(&export.stderr)
     );
-    verify_output(output, project, None).unwrap();
+    if let Err(error) = verify_output(output, project, None) {
+        let output_probe = probe::probe_media(output, None).ok();
+        panic!(
+            "verification failed for {:?}: {error:?}; output metadata: {output_probe:?}",
+            output.file_name()
+        );
+    }
 }
 
 fn assert_audio_drift_within_one_frame(ffprobe: &Path, output: &Path, frame_rate: u32) {
@@ -225,7 +231,8 @@ fn generated_probe_fixture_matrix_covers_boundaries_and_variants() {
             "aac".as_ref(),
             "-ar".as_ref(),
             "48000".as_ref(),
-            "-shortest".as_ref(),
+            "-t".as_ref(),
+            "1".as_ref(),
             variable_rate.as_os_str(),
         ],
     );
