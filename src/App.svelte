@@ -31,6 +31,7 @@
     createImageOverlay,
     createStingOverlay,
     DEFAULT_CAPTION_STYLE,
+    insertStingOverlayAtPlayhead,
     MAX_STING_OVERLAYS,
     maximumStingDurationMs,
     nextZIndex,
@@ -571,7 +572,7 @@
     }
   }
 
-  async function addStingOverlay(): Promise<void> {
+  async function addStingOverlay(insertAtMs?: number): Promise<void> {
     if (!session || session.sourceStatus !== "ok" || overlayBusy) {
       return;
     }
@@ -595,15 +596,30 @@
       }
       overlayBusy = true;
       const asset = await importStingAsset(session.projectPath, sourceAssetPath);
-      const overlay = createStingOverlay(
+      let overlay = createStingOverlay(
         crypto.randomUUID(),
         asset,
         session.project.timeline.inMs,
         session.project.timeline.outMs,
         nextZIndex(session.project.overlays),
       );
+      if (insertAtMs !== undefined) {
+        overlay = insertStingOverlayAtPlayhead(
+          overlay,
+          overlay.id,
+          insertAtMs,
+          session.project.timeline.inMs,
+          session.project.timeline.outMs,
+          overlay.zIndex,
+        );
+      }
       session.project.overlays.push(overlay);
-      selectOverlay(overlay.id);
+      if (insertAtMs === undefined) {
+        selectOverlay(overlay.id);
+      } else {
+        selectedOverlayId = overlay.id;
+        captionStatus = "idle";
+      }
       markProjectDirty();
     } catch (error) {
       actionError =
@@ -618,6 +634,44 @@
     } finally {
       overlayBusy = false;
     }
+  }
+
+  async function insertStingAtPlayhead(): Promise<void> {
+    if (!session || session.sourceStatus !== "ok" || overlayBusy) {
+      return;
+    }
+    const stings = session.project.overlays.filter(
+      (overlay) => overlay.type === "sting",
+    );
+    if (stings.length >= MAX_STING_OVERLAYS) {
+      actionError = {
+        code: "E_INVALID_ARGUMENT",
+        message: "This project has reached the eight-sting limit.",
+        safeDetail: "Remove an existing sting before inserting another.",
+        retryable: false,
+      };
+      return;
+    }
+    const template =
+      stings.find(({ id }) => id === selectedOverlayId) ??
+      [...stings].sort((a, b) => b.zIndex - a.zIndex)[0];
+    if (!template) {
+      await addStingOverlay(playheadMs);
+      return;
+    }
+    const inserted = insertStingOverlayAtPlayhead(
+      template,
+      crypto.randomUUID(),
+      playheadMs,
+      session.project.timeline.inMs,
+      session.project.timeline.outMs,
+      nextZIndex(session.project.overlays),
+    );
+    session.project.overlays.push(inserted);
+    selectedOverlayId = inserted.id;
+    captionStatus = "idle";
+    actionError = null;
+    markProjectDirty();
   }
 
   async function replaceImageOverlay(id: string): Promise<void> {
@@ -1342,8 +1396,12 @@
         {playing}
         overlays={session.project.overlays}
         disabled={session.sourceStatus !== "ok"}
+        insertStingDisabled={overlayBusy ||
+          session.project.overlays.filter((overlay) => overlay.type === "sting").length >=
+            MAX_STING_OVERLAYS}
         onInChange={updateTrimIn}
         onOutChange={updateTrimOut}
+        onInsertSting={insertStingAtPlayhead}
         onPlayheadChange={updatePlayhead}
         onPlayingChange={updatePlaying}
       />

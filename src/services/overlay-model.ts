@@ -125,6 +125,29 @@ export function createStingOverlay(
   };
 }
 
+export function insertStingOverlayAtPlayhead(
+  source: StingOverlay,
+  id: string,
+  playheadMs: number,
+  inMs: number,
+  outMs: number,
+  zIndex: number,
+): StingOverlay {
+  if (outMs - inMs < 500) {
+    throw new Error("The active range must leave at least 500 ms for the Skull'd sting.");
+  }
+  const startMs = Math.round(clamp(playheadMs, inMs, outMs - 500));
+  const durationMs = Math.min(source.endMs - source.startMs, outMs - startMs);
+  return {
+    ...source,
+    id,
+    position: { ...source.position },
+    startMs,
+    endMs: startMs + durationMs,
+    zIndex,
+  };
+}
+
 export function stingPlaybackRate(overlay: StingOverlay): 1 | 2 | 3 {
   return overlay.playbackRate ?? LEGACY_STING_PLAYBACK_RATE;
 }

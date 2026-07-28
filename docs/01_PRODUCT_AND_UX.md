@@ -171,6 +171,8 @@ Image properties:
 
 Skull’d sting properties:
 
+- insert a new sting at the current timeline playhead, reusing the selected sting
+  asset and settings when available and clamping only when fewer than 500 ms remain;
 - replace MP4;
 - constrained `toasty-right` motion preset;
 - choose 1×, 2×, or 3× playback;

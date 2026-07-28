@@ -1586,6 +1586,20 @@ footer {
   border-color: #ff6a47 !important;
 }
 
+.insert-sting-button {
+  min-width: 132px;
+  border-color: #ff6a47 !important;
+  color: #130c09 !important;
+  background: #ff6a47 !important;
+  font-weight: 750;
+}
+
+.insert-sting-button:hover:not(:disabled),
+.insert-sting-button:focus-visible {
+  border-color: #ff967c !important;
+  background: #ff967c !important;
+}
+
 .time-readout,
 .range-duration {
   font-family: ui-monospace, monospace;

@@ -57,6 +57,9 @@ Feature: Build a branded vertical gameplay clip
     And the dock shows speed, once or repeat, and editable duration
     And the dock shows the current playhead and animation cycle count
     And I can choose full animation, two loops, or fill remaining
+    When I choose Insert Sting Here at the current playhead
+    Then a new sting instance starts there without moving the existing sting
+    And an insertion within the final 500 milliseconds clamps safely inside the range
     When I set the sting start and end from the playhead
     Then its integer millisecond timing remains within the active range
     And exact placement and timing values remain available under advanced controls

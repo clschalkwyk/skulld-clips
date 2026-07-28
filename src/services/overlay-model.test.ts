@@ -5,6 +5,7 @@ import {
   anchorOverlay,
   createImageOverlay,
   createStingOverlay,
+  insertStingOverlayAtPlayhead,
   isOverlayVisible,
   moveOverlay,
   nudgeOverlay,
@@ -195,5 +196,62 @@ describe("overlay model", () => {
     const once = setStingRepeat(extended, false, 20_000);
     expect(once.repeat).toBe(false);
     expect(once.endMs - once.startMs).toBe(2_521);
+  });
+
+  it("inserts a new sting instance at the playhead with the selected settings", () => {
+    const source = setStingRepeat(
+      setStingPlaybackRate(
+        createStingOverlay(
+          "00000000-0000-4000-8000-000000000001",
+          stingAsset,
+          1_000,
+          20_000,
+          2,
+        ),
+        2,
+        20_000,
+      ),
+      true,
+      20_000,
+    );
+    const inserted = insertStingOverlayAtPlayhead(
+      source,
+      "00000000-0000-4000-8000-000000000002",
+      12_000,
+      1_000,
+      20_000,
+      7,
+    );
+
+    expect(inserted.id).toBe("00000000-0000-4000-8000-000000000002");
+    expect(inserted.startMs).toBe(12_000);
+    expect(inserted.endMs - inserted.startMs).toBe(source.endMs - source.startMs);
+    expect(inserted.playbackRate).toBe(2);
+    expect(inserted.repeat).toBe(true);
+    expect(inserted.position).toEqual(source.position);
+    expect(inserted.position).not.toBe(source.position);
+    expect(inserted.zIndex).toBe(7);
+  });
+
+  it("keeps an inserted sting inside the clip when the playhead is near the end", () => {
+    const source = createStingOverlay(
+      "00000000-0000-4000-8000-000000000001",
+      stingAsset,
+      1_000,
+      10_000,
+      2,
+    );
+
+    const inserted = insertStingOverlayAtPlayhead(
+      source,
+      "00000000-0000-4000-8000-000000000002",
+      9_900,
+      1_000,
+      10_000,
+      3,
+    );
+
+    expect(inserted.startMs).toBe(9_500);
+    expect(inserted.endMs).toBe(10_000);
   });
 });

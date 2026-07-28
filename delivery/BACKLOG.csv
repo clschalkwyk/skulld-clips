@@ -41,3 +41,4 @@ SCF-059,M6,Viewport-contained editor,0.25,SCF-058,"Pinned timeline with independ
 SCF-060,M6,Canvas dock editor layout,1.0,SCF-059,"Full-width rail, compact overlay dock and relative timing"
 SCF-061,M6,Variable and repeating Skull'd stings,1.5,SCF-060,"Up to eight stings with 1x/2x/3x once/repeat preview and export parity"
 SCF-062,M6,Direct sting timing controls,0.5,SCF-061,"Seconds-based start/duration, playhead marker, cycle context and useful timing presets"
+SCF-063,M6,Insert sting at playhead,0.5,SCF-062,"One-click timeline insertion that reuses the selected sting asset and settings"

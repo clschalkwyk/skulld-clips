@@ -14,8 +14,10 @@
     playing: boolean;
     overlays?: Overlay[];
     disabled?: boolean;
+    insertStingDisabled?: boolean;
     onInChange: (milliseconds: number) => void;
     onOutChange: (milliseconds: number) => void;
+    onInsertSting: () => Promise<void>;
     onPlayheadChange: (milliseconds: number) => void;
     onPlayingChange: (playing: boolean) => void;
   }
@@ -28,8 +30,10 @@
     playing,
     overlays = [],
     disabled = false,
+    insertStingDisabled = false,
     onInChange,
     onOutChange,
+    onInsertSting,
     onPlayheadChange,
     onPlayingChange,
   }: Props = $props();
@@ -64,6 +68,16 @@
     </button>
     <button type="button" disabled={disabled} onclick={() => onOutChange(playheadMs)}>
       Set out <kbd>O</kbd>
+    </button>
+    <button
+      class="insert-sting-button"
+      type="button"
+      disabled={disabled || insertStingDisabled}
+      aria-label="Insert a new Skull’d sting at the current playhead"
+      title="Insert a new Skull’d sting at the current playhead"
+      onclick={onInsertSting}
+    >
+      Insert Sting Here
     </button>
     <span class="range-duration">
       Range {formatTimelineTime(outMs - inMs)}
