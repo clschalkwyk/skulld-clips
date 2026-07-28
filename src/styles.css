@@ -1045,7 +1045,7 @@ footer {
 
 .anchor-grid button {
   min-width: 0;
-  min-height: 26px;
+  min-height: 21px;
   border: 1px solid #38383d;
   padding: 0;
   color: #9d9690;
@@ -1146,7 +1146,7 @@ footer {
 }
 
 .timing-editor {
-  gap: 8px;
+  gap: 6px;
 }
 
 .relative-timing-summary {
@@ -1158,10 +1158,33 @@ footer {
 .relative-timing-summary > div {
   min-width: 0;
   display: grid;
-  gap: 4px;
-  padding: 7px;
+  gap: 3px;
+  padding: 5px;
   border: 1px solid #302e34;
   background: #0e0d10;
+}
+
+.timing-field-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.timing-field-heading button {
+  min-width: 0;
+  border: 0;
+  padding: 1px 0;
+  color: #ff967c;
+  background: transparent;
+  font-size: 8px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.timing-field-heading button:hover {
+  color: #ffffff;
 }
 
 .relative-timing-summary span {
@@ -1180,14 +1203,14 @@ footer {
   white-space: nowrap;
 }
 
-.sting-duration-control {
+.timing-number-control {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.sting-duration-control input {
+.timing-number-control input {
   min-width: 0;
   width: 100%;
   border: 1px solid #38383d;
@@ -1199,7 +1222,7 @@ footer {
   font-size: 10px;
 }
 
-.sting-duration-control > span {
+.timing-number-control > span {
   color: #8f8982;
   font-family: ui-monospace, monospace;
   font-size: 10px;
@@ -1260,6 +1283,52 @@ footer {
   background: rgb(114 214 160 / 9%);
 }
 
+.sting-timing-context {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #7c7670;
+  font-size: 9px;
+}
+
+.sting-timing-context span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sting-timing-context strong {
+  flex: none;
+  color: #d7f6e4;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.sting-timing-presets {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr 1.15fr;
+}
+
+.sting-timing-presets button {
+  min-width: 0;
+  border: 1px solid #38383d;
+  padding: 6px 4px;
+  color: #b0aaa3;
+  background: #0e0d10;
+  font-size: 9px;
+}
+
+.sting-timing-presets button + button {
+  border-left: 0;
+}
+
+.sting-timing-presets button:hover {
+  border-color: #ff6a47;
+  color: #f4f0e8;
+}
+
 .relative-timing-track {
   position: relative;
   height: 14px;
@@ -1277,7 +1346,7 @@ footer {
   border-left: 1px solid #252429;
 }
 
-.relative-timing-track span {
+.relative-timing-track .timing-range {
   position: absolute;
   top: 3px;
   bottom: 3px;
@@ -1285,19 +1354,25 @@ footer {
   background: #72d6a0;
 }
 
-.playhead-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
+.timing-playhead {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ff6a47;
+  transform: translateX(-0.5px);
 }
 
-.playhead-actions button {
-  min-width: 0;
-  border: 1px solid #454149;
-  padding: 6px;
-  color: #f4f0e8;
-  background: transparent;
-  font-size: 10px;
+.timing-playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: #ff6a47;
+  transform: translateX(-50%);
 }
 
 .advanced-overlay {

@@ -180,8 +180,10 @@ Skull’d sting properties:
 - reset to the bottom-right safe placement;
 - choose one of nine safe-area anchors;
 - adjust size as the primary numeric placement control;
+- edit the start offset after clip in and duration directly in seconds;
 - set the start or end from the current playhead;
-- see start offset and duration relative to the active clip;
+- see the selected-speed animation length, cycle count, and playhead position;
+- apply full-animation, two-loop, or fill-remaining timing presets;
 - nudge by 1, 8, or 24 output pixels;
 - adjust left and top under advanced controls;
 - reveal exact normalized placement and timing values only on demand.

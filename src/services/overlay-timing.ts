@@ -88,6 +88,28 @@ export function placeOverlayEndAtPlayhead(
   };
 }
 
+export function placeOverlayAtStartOffset(
+  requestedOffsetMs: number,
+  currentStartMs: number,
+  currentEndMs: number,
+  clipInMs: number,
+  clipOutMs: number,
+): OverlayTimingRange {
+  const durationMs = boundedDuration(
+    currentEndMs - currentStartMs,
+    clipOutMs - clipInMs,
+    1,
+    Number.POSITIVE_INFINITY,
+  );
+  const startMs = Math.round(
+    clamp(clipInMs + requestedOffsetMs, clipInMs, clipOutMs - durationMs),
+  );
+  return {
+    startMs,
+    endMs: startMs + durationMs,
+  };
+}
+
 function boundedDuration(
   requestedDurationMs: number,
   clipDurationMs: number,

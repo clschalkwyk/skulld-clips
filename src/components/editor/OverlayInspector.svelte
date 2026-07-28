@@ -15,12 +15,14 @@
     setStingDuration,
     setStingPlaybackRate,
     setStingRepeat,
+    stingCycleDurationMs,
     stingPlaybackRate,
     stingRepeats,
     type OverlayAnchor,
   } from "../../services/overlay-model";
   import {
     formatRelativeSeconds,
+    placeOverlayAtStartOffset,
     placeOverlayEndAtPlayhead,
     placeOverlayStartAtPlayhead,
     relativeOverlayTiming,
@@ -69,6 +71,24 @@
   );
   const timingBarStyle = $derived(
     `left:${timing.leftPercent}%;width:${timing.widthPercent}%`,
+  );
+  const playheadPercent = $derived(
+    clamp(
+      ((playheadMs - timelineInMs) /
+        Math.max(1, timelineOutMs - timelineInMs)) *
+        100,
+      0,
+      100,
+    ),
+  );
+  const playheadStyle = $derived(`left:${playheadPercent}%`);
+  const stingCycleMs = $derived(
+    overlay.type === "sting" ? stingCycleDurationMs(overlay) : 0,
+  );
+  const stingCycleCount = $derived(
+    overlay.type === "sting" && stingCycleMs > 0
+      ? timing.durationMs / stingCycleMs
+      : 0,
   );
 
   const anchors: Array<{
@@ -167,6 +187,55 @@
         clamp(value, overlay.startMs + minimumDuration, maximumEnd),
       ),
     });
+  }
+
+  function updateStartOffsetSeconds(value: number): void {
+    const range = placeOverlayAtStartOffset(
+      Math.round(value * 1_000),
+      overlay.startMs,
+      overlay.endMs,
+      timelineInMs,
+      timelineOutMs,
+    );
+    onChange({ ...overlay, ...range });
+  }
+
+  function showFullStingAnimation(): void {
+    if (overlay.type === "sting") {
+      onChange(setStingRepeat(overlay, false, timelineOutMs));
+    }
+  }
+
+  function showTwoStingLoops(): void {
+    if (overlay.type === "sting") {
+      const repeating = { ...overlay, repeat: true };
+      onChange(
+        setStingDuration(
+          repeating,
+          stingCycleDurationMs(repeating) * 2,
+          timelineOutMs,
+        ),
+      );
+    }
+  }
+
+  function fillStingRemainder(): void {
+    if (overlay.type === "sting") {
+      const repeating = { ...overlay, repeat: true };
+      onChange(
+        setStingDuration(
+          repeating,
+          timelineOutMs - repeating.startMs,
+          timelineOutMs,
+        ),
+      );
+    }
+  }
+
+  function updateStingRepeatMode(repeat: boolean): void {
+    if (overlay.type === "sting" && stingRepeats(overlay) !== repeat) {
+      onChange(setStingRepeat(overlay, repeat, timelineOutMs));
+    }
   }
 
   function setStartAtPlayhead(): void {
@@ -319,17 +388,43 @@
     </div>
     <div class="relative-timing-summary">
       <div>
-        <span>Starts</span>
-        <strong>
-          {timing.startOffsetMs <= 0
-            ? "At clip in"
-            : `+${formatRelativeSeconds(timing.startOffsetMs)} after in`}
-        </strong>
+        <div class="timing-field-heading">
+          <span>Start after in</span>
+          <button type="button" disabled={disabled} onclick={setStartAtPlayhead}>
+            Playhead
+          </button>
+        </div>
+        {#if overlay.type === "sting"}
+          <label class="timing-number-control">
+            <input
+              type="number"
+              min="0"
+              max={(timelineOutMs - timelineInMs - timing.durationMs) / 1_000}
+              step="0.1"
+              value={(timing.startOffsetMs / 1_000).toFixed(2)}
+              disabled={disabled}
+              aria-label="Sting start in seconds after clip in"
+              onchange={(event) => updateStartOffsetSeconds(numberValue(event))}
+            />
+            <span>s</span>
+          </label>
+        {:else}
+          <strong>
+            {timing.startOffsetMs <= 0
+              ? "At clip in"
+              : `+${formatRelativeSeconds(timing.startOffsetMs)} after in`}
+          </strong>
+        {/if}
       </div>
       <div>
-        <span>Duration</span>
+        <div class="timing-field-heading">
+          <span>Duration</span>
+          <button type="button" disabled={disabled} onclick={setEndAtPlayhead}>
+            End here
+          </button>
+        </div>
         {#if overlay.type === "sting"}
-          <label class="sting-duration-control">
+          <label class="timing-number-control">
             <input
               type="number"
               min="0.5"
@@ -387,7 +482,7 @@
               class:active={!stingRepeats(overlay)}
               aria-pressed={!stingRepeats(overlay)}
               disabled={disabled}
-              onclick={() => onChange(setStingRepeat(overlay, false, timelineOutMs))}
+              onclick={() => updateStingRepeatMode(false)}
             >
               Once
             </button>
@@ -396,25 +491,42 @@
               class:active={stingRepeats(overlay)}
               aria-pressed={stingRepeats(overlay)}
               disabled={disabled}
-              onclick={() => onChange(setStingRepeat(overlay, true, timelineOutMs))}
+              onclick={() => updateStingRepeatMode(true)}
             >
               Repeat
             </button>
           </div>
         </fieldset>
       </div>
+      <div class="relative-timing-track" aria-label="Overlay position within selected clip">
+        <span class="timing-range" style={timingBarStyle}></span>
+        <i class="timing-playhead" style={playheadStyle} aria-hidden="true"></i>
+      </div>
+      <div class="sting-timing-context" aria-live="polite">
+        <span>
+          One animation is {formatRelativeSeconds(stingCycleMs)} at
+          {stingPlaybackRate(overlay)}×.
+        </span>
+        <strong>{stingCycleCount.toFixed(stingCycleCount < 10 ? 1 : 0)} cycles</strong>
+      </div>
+      <div class="sting-timing-presets" aria-label="Sting timing presets">
+        <button type="button" disabled={disabled} onclick={showFullStingAnimation}>
+          Full animation
+        </button>
+        <button type="button" disabled={disabled} onclick={showTwoStingLoops}>
+          2 loops
+        </button>
+        <button type="button" disabled={disabled} onclick={fillStingRemainder}>
+          Fill remaining
+        </button>
+      </div>
     {/if}
-    <div class="relative-timing-track" aria-label="Overlay position within selected clip">
-      <span style={timingBarStyle}></span>
-    </div>
-    <div class="playhead-actions">
-      <button type="button" disabled={disabled} onclick={setStartAtPlayhead}>
-        Start at playhead
-      </button>
-      <button type="button" disabled={disabled} onclick={setEndAtPlayhead}>
-        End at playhead
-      </button>
-    </div>
+    {#if overlay.type !== "sting"}
+      <div class="relative-timing-track" aria-label="Overlay position within selected clip">
+        <span class="timing-range" style={timingBarStyle}></span>
+        <i class="timing-playhead" style={playheadStyle} aria-hidden="true"></i>
+      </div>
+    {/if}
   </div>
 
   <details class="advanced-overlay">

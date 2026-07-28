@@ -55,6 +55,8 @@ Feature: Build a branded vertical gameplay clip
     And the dock shows nine placement anchors and a size control
     And the dock shows the sting start offset and duration relative to clip in
     And the dock shows speed, once or repeat, and editable duration
+    And the dock shows the current playhead and animation cycle count
+    And I can choose full animation, two loops, or fill remaining
     When I set the sting start and end from the playhead
     Then its integer millisecond timing remains within the active range
     And exact placement and timing values remain available under advanced controls

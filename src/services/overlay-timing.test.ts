@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatRelativeSeconds,
+  placeOverlayAtStartOffset,
   placeOverlayEndAtPlayhead,
   placeOverlayStartAtPlayhead,
   relativeOverlayTiming,
@@ -83,5 +84,29 @@ describe("overlay timing presentation", () => {
         500,
       ),
     ).toEqual({ startMs: 10_000, endMs: 10_500 });
+  });
+
+  it("moves an overlay by clip-relative offset while preserving duration", () => {
+    expect(
+      placeOverlayAtStartOffset(
+        2_500,
+        10_000,
+        11_680,
+        10_000,
+        20_000,
+      ),
+    ).toEqual({ startMs: 12_500, endMs: 14_180 });
+  });
+
+  it("clamps a relative start without shortening the overlay", () => {
+    expect(
+      placeOverlayAtStartOffset(
+        9_500,
+        10_000,
+        11_680,
+        10_000,
+        20_000,
+      ),
+    ).toEqual({ startMs: 18_320, endMs: 20_000 });
   });
 });
