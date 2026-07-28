@@ -324,10 +324,10 @@
     }
     return {
       projectPath: session.projectPath,
-      projectSnapshot: structuredClone(session.project),
+      projectSnapshot: $state.snapshot(session.project),
       destinationPath: exportDestination,
       overwrite: exportOverwriteConfirmed,
-      settings: structuredClone(session.project.exportDefaults),
+      settings: $state.snapshot(session.project.exportDefaults),
     };
   }
 
