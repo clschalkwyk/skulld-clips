@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "id": "3bcefd77-7393-49b2-99b3-1f47a28f34ab",
+  "name": "Skull'd sting example",
+  "createdAt": "2026-07-28T10:00:00Z",
+  "updatedAt": "2026-07-28T10:05:00Z",
+  "source": {
+    "path": "C:\\Users\\creator\\Videos\\gameplay.mp4",
+    "filename": "gameplay.mp4",
+    "fingerprint": {
+      "sizeBytes": 2147483648,
+      "modifiedAtMs": 1785070800000,
+      "firstChunkSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "lastChunkSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "probe": {
+      "durationMs": 120000,
+      "containerName": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fileSizeBytes": 2147483648,
+      "video": {
+        "streamIndex": 0,
+        "codec": "h264",
+        "rawWidth": 1920,
+        "rawHeight": 1080,
+        "displayWidth": 1920,
+        "displayHeight": 1080,
+        "rotationDegrees": 0,
+        "avgFrameRate": 60.0,
+        "realFrameRate": 60.0,
+        "pixelFormat": "yuv420p",
+        "sampleAspectRatio": "1:1"
+      },
+      "hasAudio": true,
+      "audio": {
+        "streamIndex": 1,
+        "codec": "aac",
+        "sampleRate": 48000,
+        "channels": 2,
+        "channelLayout": "stereo"
+      },
+      "warnings": []
+    }
+  },
+  "timeline": {
+    "inMs": 8400,
+    "outMs": 23600
+  },
+  "canvas": {
+    "width": 1080,
+    "height": 1920,
+    "background": "crop-fill"
+  },
+  "crop": {
+    "x": 0.341797,
+    "y": 0.0,
+    "width": 0.316406,
+    "height": 1.0
+  },
+  "overlays": [
+    {
+      "type": "sting",
+      "id": "9496d998-46fb-46dc-871e-df47967787dd",
+      "name": "Skull'd Toasty",
+      "position": {
+        "x": 0.57037,
+        "y": 0.729167,
+        "width": 0.407407,
+        "height": 0.229167
+      },
+      "opacity": 1.0,
+      "startMs": 10400,
+      "endMs": 12080,
+      "zIndex": 30,
+      "asset": {
+        "relativePath": "assets/stings/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.mp4",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "width": 832,
+        "height": 832,
+        "mimeType": "video/mp4",
+        "originalFilename": "skulld-green-sting.mp4",
+        "durationMs": 5042,
+        "hasAudio": true,
+        "preview": {
+          "relativePath": "assets/stings/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.preview.png",
+          "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "width": 960,
+          "height": 768,
+          "frameWidth": 192,
+          "frameHeight": 192,
+          "columns": 5,
+          "rows": 4,
+          "frameCount": 20,
+          "framesPerSecond": 12
+        }
+      },
+      "preset": "toasty-right",
+      "includeAudio": true
+    }
+  ],
+  "exportDefaults": {
+    "presetId": "youtube-shorts",
+    "qualityMode": "balanced",
+    "frameRateMode": "source-capped-60",
+    "videoCodec": "h264",
+    "pixelFormat": "yuv420p",
+    "audioCodec": "aac",
+    "audioBitrateKbps": 192
+  }
+}

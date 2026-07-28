@@ -109,7 +109,9 @@ Stages:
 5. scale 1080×1920;
 6. sample aspect reset;
 7. overlay each PNG in z-order;
-8. encode/mux.
+8. key and composite the optional fixed-preset sting in z-order;
+9. mix optional sting audio;
+10. encode/mux.
 
 Illustrative graph:
 
@@ -143,6 +145,24 @@ Optional audio:
 
 Rust accepts validated values, not raw filter fragments.
 
+### Constrained Skull’d sting
+
+The `toasty-right` preset is generated entirely by Rust:
+
+- input MP4 is project-owned, content-addressed and pre-probed;
+- import creates a bounded 12 fps transparent PNG sprite for preview;
+- video is trimmed to the overlay window and played at 3×;
+- `chromakey` uses the fixed captured-green profile;
+- the keyed frame is scaled through the output-canvas coordinate mapper;
+- x position enters from the right over 180 ms and exits over 120 ms;
+- `eof_action=pass` and `repeatlast=0` prevent a frozen final frame;
+- optional clip audio uses matching 3× tempo, is delayed to the overlay start,
+  mixed with bounded source ducking and limited before AAC encoding.
+
+Only one sting is accepted in a project. No key colour, similarity, blend,
+playback expression, filter expression or raw media argument crosses the
+frontend boundary.
+
 ## Representative encoding arguments
 
 ```text
@@ -174,7 +194,7 @@ Rules:
 
 - process argument vector only;
 - `-y` only after overwrite is approved;
-- audio branch depends on probe;
+- audio branch depends on source and verified sting probes;
 - output duration is bounded;
 - final filename does not exist before verification.
 

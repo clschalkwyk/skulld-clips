@@ -8,10 +8,13 @@ use std::{
 use uuid::Uuid;
 
 use crate::{
-    domain::{centered_crop, FrameRateMode, Overlay, ProjectV1, QualityMode},
+    domain::{
+        centered_crop, FrameRateMode, NormalizedRect, Overlay, OverlayBase, ProjectV1, QualityMode,
+        StingPreset,
+    },
     ffmpeg::args::build_ffmpeg_args,
     ffmpeg::filter_graph::resolved_frame_rate,
-    services::{export::verify_output, media_tools, probe, projects},
+    services::{assets, export::verify_output, media_tools, probe, projects},
 };
 
 fn integration_enabled() -> bool {
@@ -447,7 +450,7 @@ fn golden_export_frame_matches_the_shared_crop_and_overlay_mapping() {
         .clone();
     let caption_base = match &mut caption {
         Overlay::Caption { base, .. } => base,
-        Overlay::Image { .. } => unreachable!(),
+        Overlay::Image { .. } | Overlay::Sting { .. } => unreachable!(),
     };
     caption_base.position.x = 0.55;
     caption_base.position.y = 0.65;
@@ -464,7 +467,7 @@ fn golden_export_frame_matches_the_shared_crop_and_overlay_mapping() {
         .clone();
     let base = match &mut image {
         Overlay::Image { base, .. } => base,
-        Overlay::Caption { .. } => unreachable!(),
+        Overlay::Caption { .. } | Overlay::Sting { .. } => unreachable!(),
     };
     base.position.x = 0.1;
     base.position.y = 0.2;
@@ -534,4 +537,197 @@ fn golden_export_frame_matches_the_shared_crop_and_overlay_mapping() {
 fn rgb_at(frame: &[u8], width: usize, x: usize, y: usize) -> [u8; 3] {
     let offset = (y * width + x) * 3;
     [frame[offset], frame[offset + 1], frame[offset + 2]]
+}
+
+#[test]
+fn constrained_sting_keys_moves_mixes_and_does_not_freeze() {
+    if !integration_enabled() {
+        return;
+    }
+    let ffmpeg = media_tools::resolve_ffmpeg_path(None).unwrap();
+    let root = fixture_root("sting");
+    let source = root.join("blue source with audio.mp4");
+    let sting = root.join("green Skull'd sting.mp4");
+    let output = root.join("sting result.partial.mp4");
+    generate_video(
+        &ffmpeg,
+        &source,
+        "color=c=blue:size=640x360:rate=30",
+        "2",
+        true,
+        "libx264",
+    );
+    let generated_sting = Command::new(&ffmpeg)
+        .args([
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=0x06EE11:size=256x256:rate=30:duration=3,drawbox=x=80:y=80:w=96:h=96:color=red:t=fill",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=880:sample_rate=48000:duration=3",
+            "-t",
+            "3",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+        ])
+        .arg(&sting)
+        .output()
+        .unwrap();
+    assert!(
+        generated_sting.status.success(),
+        "sting generation failed: {}",
+        String::from_utf8_lossy(&generated_sting.stderr)
+    );
+
+    let source_probe = probe::probe_media(&source, None).unwrap();
+    let sting_probe = probe::probe_media(&sting, None).unwrap();
+    let project_directory = root.join(Uuid::new_v4().to_string());
+    fs::create_dir_all(&project_directory).unwrap();
+    let project_path = project_directory.join("project.skcf.json");
+    fs::write(&project_path, b"{}").unwrap();
+    let (sting_asset, stored_sting, preview_path) =
+        assets::import_sting_asset(&project_path, &sting, &sting_probe, &ffmpeg).unwrap();
+    assert!(stored_sting.is_file());
+    assert!(preview_path.is_file());
+    assert_eq!(
+        (
+            sting_asset.preview.width,
+            sting_asset.preview.height,
+            sting_asset.preview.frame_count,
+        ),
+        (768, 576, 12)
+    );
+    let preview_rgba = run(
+        &ffmpeg,
+        &[
+            "-hide_banner".as_ref(),
+            "-loglevel".as_ref(),
+            "error".as_ref(),
+            "-i".as_ref(),
+            preview_path.as_os_str(),
+            "-frames:v".as_ref(),
+            "1".as_ref(),
+            "-f".as_ref(),
+            "rawvideo".as_ref(),
+            "-pix_fmt".as_ref(),
+            "rgba".as_ref(),
+            "pipe:1".as_ref(),
+        ],
+    )
+    .stdout;
+    let transparent_offset = (10 * 768 + 10) * 4;
+    let subject_offset = (90 * 768 + 90) * 4;
+    assert!(preview_rgba[transparent_offset + 3] < 10);
+    assert!(preview_rgba[subject_offset] > 180 && preview_rgba[subject_offset + 3] > 200);
+    let mut project = project_for_source(&source, &source_probe);
+    project.timeline.out_ms = 2_000;
+    project.overlays = vec![Overlay::Sting {
+        base: OverlayBase {
+            id: Uuid::new_v4().to_string(),
+            name: "Skull'd sting".to_owned(),
+            position: NormalizedRect {
+                x: 0.5,
+                y: 0.5,
+                width: 0.25,
+                height: 0.140_625,
+            },
+            opacity: 1.0,
+            start_ms: 500,
+            end_ms: 1_500,
+            z_index: 0,
+        },
+        asset: sting_asset,
+        preset: StingPreset::ToastyRight,
+        include_audio: true,
+    }];
+    project.validate().unwrap();
+    assets::validate_project_assets(&project_path, &project, true).unwrap();
+
+    let args = build_ffmpeg_args(
+        &project,
+        &project.export_defaults,
+        &[&stored_sting],
+        &output,
+        false,
+    )
+    .unwrap();
+    let exported = Command::new(&ffmpeg).args(args).output().unwrap();
+    assert!(
+        exported.status.success(),
+        "sting export failed: {}",
+        String::from_utf8_lossy(&exported.stderr)
+    );
+    verify_output(&output, &project, None).unwrap();
+
+    let frame_at = |seconds: &str| {
+        run(
+            &ffmpeg,
+            &[
+                "-hide_banner".as_ref(),
+                "-loglevel".as_ref(),
+                "error".as_ref(),
+                "-ss".as_ref(),
+                seconds.as_ref(),
+                "-i".as_ref(),
+                output.as_os_str(),
+                "-frames:v".as_ref(),
+                "1".as_ref(),
+                "-f".as_ref(),
+                "rawvideo".as_ref(),
+                "-pix_fmt".as_ref(),
+                "rgb24".as_ref(),
+                "pipe:1".as_ref(),
+            ],
+        )
+        .stdout
+    };
+    let active = frame_at("1.0");
+    let after = frame_at("1.7");
+    let keyed_background = rgb_at(&active, 1080, 550, 970);
+    let sting_subject = rgb_at(&active, 1080, 675, 1_095);
+    let cleared_subject = rgb_at(&after, 1080, 675, 1_095);
+    assert!(
+        keyed_background[2] > 200 && keyed_background[0] < 50 && keyed_background[1] < 50,
+        "keyed background was {keyed_background:?}"
+    );
+    assert!(
+        sting_subject[0] > 180 && sting_subject[1] < 80 && sting_subject[2] < 80,
+        "sting subject was {sting_subject:?}"
+    );
+    assert!(
+        cleared_subject[2] > 200 && cleared_subject[0] < 50 && cleared_subject[1] < 50,
+        "post-sting frame froze at {cleared_subject:?}"
+    );
+
+    let volume = Command::new(&ffmpeg)
+        .args([
+            "-hide_banner",
+            "-i",
+            output.to_str().unwrap(),
+            "-af",
+            "volumedetect",
+            "-f",
+            "null",
+            "-",
+        ])
+        .output()
+        .unwrap();
+    assert!(volume.status.success());
+    let volume_report = String::from_utf8_lossy(&volume.stderr);
+    assert!(
+        volume_report.contains("max_volume: -"),
+        "sting mix was not kept below full scale: {volume_report}"
+    );
+
+    fs::remove_dir_all(root).unwrap();
 }

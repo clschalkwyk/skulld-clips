@@ -16,6 +16,7 @@ import type {
   RecentProject,
   RelinkSourceResult,
   SaveProjectResult,
+  StingAssetRef,
 } from "../../contracts/types";
 
 export interface StartExportResponse {
@@ -132,6 +133,12 @@ export function selectOverlayFile(
   return invokeNative("select_overlay_file", undefined, invokeCommand);
 }
 
+export function selectStingFile(
+  invokeCommand: InvokeFn = invoke,
+): Promise<string | null> {
+  return invokeNative("select_sting_file", undefined, invokeCommand);
+}
+
 export function probeMedia(
   path: string,
   invokeCommand: InvokeFn = invoke,
@@ -199,6 +206,18 @@ export function importOverlayAsset(
 ): Promise<AssetRef> {
   return invokeNative(
     "import_overlay_asset",
+    { projectPath, sourceAssetPath },
+    invokeCommand,
+  );
+}
+
+export function importStingAsset(
+  projectPath: string,
+  sourceAssetPath: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<StingAssetRef> {
+  return invokeNative(
+    "import_sting_asset",
     { projectPath, sourceAssetPath },
     invokeCommand,
   );

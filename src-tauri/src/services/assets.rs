@@ -1,16 +1,25 @@
 use std::{
+    ffi::OsString,
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::domain::{AppError, AssetRef, ProjectAssetKind, ProjectV1};
+use crate::{
+    domain::{
+        AppError, AssetRef, MediaProbe, ProjectAssetKind, ProjectV1, StingAssetRef, StingPreviewRef,
+    },
+    services::process,
+};
 
 const MAX_OVERLAY_BYTES: u64 = 25 * 1024 * 1024;
+const MAX_STING_BYTES: u64 = 50 * 1024 * 1024;
+const MAX_STING_PREVIEW_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_CAPTION_BYTES: usize = 10 * 1024 * 1024;
 const IMAGE_HEADER_BYTES: u64 = 256 * 1024;
 const MAX_IMAGE_DIMENSION: u32 = 16_384;
@@ -116,6 +125,182 @@ pub fn write_caption_asset(
     ))
 }
 
+pub fn import_sting_asset(
+    project_path: &Path,
+    source_path: &Path,
+    probe: &MediaProbe,
+    ffmpeg_path: &Path,
+) -> Result<(StingAssetRef, PathBuf, PathBuf), AppError> {
+    let is_mp4 = probe
+        .container_name
+        .split(',')
+        .any(|container| container == "mp4");
+    if !is_mp4
+        || !(1_500..=10_000).contains(&probe.duration_ms)
+        || probe.video.display_width == 0
+        || probe.video.display_height == 0
+        || probe.video.display_width > 4096
+        || probe.video.display_height > 4096
+        || probe.video.rotation_degrees != 0
+        || !(0.9..=1.1).contains(
+            &(f64::from(probe.video.display_width) / f64::from(probe.video.display_height)),
+        )
+        || probe.file_size_bytes > MAX_STING_BYTES
+    {
+        return Err(AppError::media_unsupported(
+            "Choose a square MP4 sting no longer than 10 seconds, larger than 4096 pixels, or over 50 MiB.",
+        ));
+    }
+    let (asset, destination) = store_sting_asset(project_path, source_path, probe)?;
+    let (preview, preview_destination) = generate_sting_preview(
+        project_path,
+        &destination,
+        &asset.sha256,
+        probe,
+        ffmpeg_path,
+    )?;
+
+    Ok((
+        StingAssetRef {
+            asset,
+            duration_ms: probe.duration_ms,
+            has_audio: probe.has_audio,
+            preview,
+        },
+        destination,
+        preview_destination,
+    ))
+}
+
+fn store_sting_asset(
+    project_path: &Path,
+    source_path: &Path,
+    probe: &MediaProbe,
+) -> Result<(AssetRef, PathBuf), AppError> {
+    let bytes = read_sting_bounded(source_path)?;
+    if bytes.len() as u64 != probe.file_size_bytes {
+        return Err(AppError::media_unsupported(
+            "The selected sting changed while it was being imported.",
+        ));
+    }
+    let content_hash = sha256_hex(&bytes);
+    let relative_path = PathBuf::from("assets")
+        .join("stings")
+        .join(format!("{content_hash}.mp4"));
+    let destination = project_asset_destination(project_path, &relative_path)?;
+    let stored = materialize_content_addressed(&destination, &bytes, MAX_STING_BYTES)?;
+    if sha256_hex(&stored) != content_hash {
+        return Err(AppError::asset_missing(
+            "An existing content-addressed sting asset has changed.",
+        ));
+    }
+    let original_filename = source_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned);
+
+    Ok((
+        AssetRef {
+            relative_path: path_to_slash_string(&relative_path)?,
+            sha256: content_hash,
+            width: probe.video.display_width,
+            height: probe.video.display_height,
+            mime_type: "video/mp4".to_owned(),
+            original_filename,
+        },
+        destination,
+    ))
+}
+
+fn generate_sting_preview(
+    project_path: &Path,
+    sting_path: &Path,
+    sting_hash: &str,
+    probe: &MediaProbe,
+    ffmpeg_path: &Path,
+) -> Result<(StingPreviewRef, PathBuf), AppError> {
+    let frame_count = u32::try_from(probe.duration_ms.saturating_mul(4) / 1_000)
+        .unwrap_or(40)
+        .clamp(6, 40);
+    let columns = f64::from(frame_count).sqrt().ceil() as u32;
+    let rows = frame_count.div_ceil(columns);
+    let relative_path = PathBuf::from("assets")
+        .join("stings")
+        .join(format!("{sting_hash}.preview.png"));
+    let destination = project_asset_destination(project_path, &relative_path)?;
+    if !destination.is_file() {
+        let parent = destination
+            .parent()
+            .ok_or_else(|| AppError::project_schema("Sting preview folder is unavailable."))?;
+        let temporary = parent.join(format!(".sting-preview-{}.png", Uuid::new_v4()));
+        let filter = format!(
+            "trim=start=0:end={:.3},setpts=(PTS-STARTPTS)/3,fps=12,chromakey=0x06EE11:0.160000:0.050000,format=rgba,scale=192:192:flags=lanczos,tile={}x{}:nb_frames={frame_count}:padding=0:margin=0:color=0x00000000",
+            probe.duration_ms as f64 / 1_000.0,
+            columns,
+            rows,
+        );
+        let args: Vec<OsString> = vec![
+            "-hide_banner".into(),
+            "-loglevel".into(),
+            "error".into(),
+            "-nostdin".into(),
+            "-i".into(),
+            sting_path.as_os_str().to_owned(),
+            "-vf".into(),
+            filter.into(),
+            "-frames:v".into(),
+            "1".into(),
+            "-an".into(),
+            "-y".into(),
+            temporary.as_os_str().to_owned(),
+        ];
+        let generated =
+            process::run_bounded(ffmpeg_path, &args, Duration::from_secs(30), 64 * 1024);
+        let successful = generated.is_ok_and(|output| output.status.success());
+        if !successful {
+            let _ = fs::remove_file(&temporary);
+            return Err(AppError::media_unsupported(
+                "The Skull'd sting preview could not be generated with the fixed green-key preset.",
+            ));
+        }
+        fs::rename(&temporary, &destination).map_err(|_| {
+            let _ = fs::remove_file(&temporary);
+            AppError::io(
+                "The Skull'd sting preview could not be saved.",
+                "Check project folder permissions and available disk space.",
+            )
+        })?;
+    }
+
+    let bytes = read_preview_bounded(&destination)?;
+    let info = inspect_image(&bytes)?;
+    let expected_width = columns * 192;
+    let expected_height = rows * 192;
+    if info.mime_type != "image/png"
+        || info.width != expected_width
+        || info.height != expected_height
+    {
+        return Err(AppError::asset_missing(
+            "The generated Skull'd sting preview no longer matches its metadata.",
+        ));
+    }
+    Ok((
+        StingPreviewRef {
+            relative_path: path_to_slash_string(&relative_path)?,
+            sha256: sha256_hex(&bytes),
+            width: info.width,
+            height: info.height,
+            frame_width: 192,
+            frame_height: 192,
+            columns,
+            rows,
+            frame_count,
+            frames_per_second: 12,
+        },
+        destination,
+    ))
+}
+
 pub fn validate_project_assets(
     project_path: &Path,
     project: &ProjectV1,
@@ -133,30 +318,85 @@ pub fn validate_project_assets(
                 "A project asset resolves outside the project folder.",
             ));
         }
-        let verify_hash = verify_overlay_hashes && kind == ProjectAssetKind::Overlay;
-        let bytes = if verify_hash {
-            read_bounded(&canonical, MAX_OVERLAY_BYTES)?
-        } else {
-            read_prefix(&canonical, IMAGE_HEADER_BYTES)?
-        };
-        let info = inspect_image(&bytes)?;
         let stem_matches = canonical
             .file_stem()
             .and_then(|stem| stem.to_str())
             .is_some_and(|stem| stem == asset.sha256);
-        if !stem_matches
-            || info.width != asset.width
-            || info.height != asset.height
-            || info.mime_type != asset.mime_type
-        {
+        if !stem_matches {
             return Err(AppError::asset_missing(
                 "A project asset no longer matches its saved metadata.",
             ));
         }
-        if verify_hash && sha256_hex(&bytes) != asset.sha256 {
-            return Err(AppError::asset_missing(
-                "An imported overlay asset has changed.",
-            ));
+
+        if kind == ProjectAssetKind::Sting {
+            let metadata = fs::metadata(&canonical).map_err(|_| {
+                AppError::asset_missing("The project sting asset could not be inspected.")
+            })?;
+            if asset.mime_type != "video/mp4"
+                || canonical
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    != Some("mp4")
+                || metadata.len() == 0
+                || metadata.len() > MAX_STING_BYTES
+            {
+                return Err(AppError::asset_missing(
+                    "A project sting no longer matches its saved metadata.",
+                ));
+            }
+            if verify_overlay_hashes {
+                let bytes = read_sting_bounded(&canonical)?;
+                if sha256_hex(&bytes) != asset.sha256 {
+                    return Err(AppError::asset_missing(
+                        "An imported sting asset has changed.",
+                    ));
+                }
+            }
+            let preview = overlay
+                .sting()
+                .map(|(sting, _)| &sting.preview)
+                .ok_or_else(|| AppError::project_schema("Sting preview metadata is missing."))?;
+            let preview_path =
+                fs::canonicalize(project_dir.join(&preview.relative_path)).map_err(|_| {
+                    AppError::asset_missing("Restore or re-import the missing sting preview.")
+                })?;
+            if !preview_path.starts_with(&project_dir) || !preview_path.is_file() {
+                return Err(AppError::asset_missing(
+                    "A sting preview resolves outside the project folder.",
+                ));
+            }
+            let preview_bytes = read_preview_bounded(&preview_path)?;
+            let preview_info = inspect_image(&preview_bytes)?;
+            if preview_info.mime_type != "image/png"
+                || preview_info.width != preview.width
+                || preview_info.height != preview.height
+                || sha256_hex(&preview_bytes) != preview.sha256
+            {
+                return Err(AppError::asset_missing(
+                    "A sting preview no longer matches its saved metadata.",
+                ));
+            }
+        } else {
+            let verify_hash = verify_overlay_hashes && kind == ProjectAssetKind::Overlay;
+            let bytes = if verify_hash {
+                read_bounded(&canonical, MAX_OVERLAY_BYTES)?
+            } else {
+                read_prefix(&canonical, IMAGE_HEADER_BYTES)?
+            };
+            let info = inspect_image(&bytes)?;
+            if info.width != asset.width
+                || info.height != asset.height
+                || info.mime_type != asset.mime_type
+            {
+                return Err(AppError::asset_missing(
+                    "A project asset no longer matches its saved metadata.",
+                ));
+            }
+            if verify_hash && sha256_hex(&bytes) != asset.sha256 {
+                return Err(AppError::asset_missing(
+                    "An imported overlay asset has changed.",
+                ));
+            }
         }
     }
     Ok(())
@@ -247,6 +487,36 @@ fn read_prefix(path: &Path, maximum: u64) -> Result<Vec<u8>, AppError> {
     file.take(maximum)
         .read_to_end(&mut bytes)
         .map_err(|_| AppError::asset_missing("The selected image asset could not be read."))?;
+    Ok(bytes)
+}
+
+fn read_sting_bounded(path: &Path) -> Result<Vec<u8>, AppError> {
+    let file = File::open(path)
+        .map_err(|_| AppError::asset_missing("The selected sting could not be opened."))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_STING_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| AppError::asset_missing("The selected sting could not be read."))?;
+    if bytes.len() as u64 > MAX_STING_BYTES {
+        return Err(AppError::invalid_argument(
+            "Skull'd sting assets may not exceed 50 MiB.",
+        ));
+    }
+    Ok(bytes)
+}
+
+fn read_preview_bounded(path: &Path) -> Result<Vec<u8>, AppError> {
+    let file = File::open(path)
+        .map_err(|_| AppError::asset_missing("The sting preview could not be opened."))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_STING_PREVIEW_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| AppError::asset_missing("The sting preview could not be read."))?;
+    if bytes.len() as u64 > MAX_STING_PREVIEW_BYTES {
+        return Err(AppError::invalid_argument(
+            "Generated sting previews may not exceed 10 MiB.",
+        ));
+    }
     Ok(bytes)
 }
 
@@ -441,7 +711,11 @@ mod tests {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use uuid::Uuid;
 
-    use super::{import_overlay_asset, inspect_image, inspect_webp, write_caption_asset};
+    use crate::domain::{AudioProbe, MediaProbe, VideoProbe};
+
+    use super::{
+        import_overlay_asset, inspect_image, inspect_webp, store_sting_asset, write_caption_asset,
+    };
 
     #[test]
     fn reads_png_dimensions_from_the_ihdr() {
@@ -505,6 +779,43 @@ mod tests {
         );
         assert_eq!((caption.width, caption.height), (900, 220));
         assert!(caption_path.is_file());
+
+        let sting_source = root.join("skulld sting.mp4");
+        fs::write(&sting_source, b"bounded mp4 fixture").unwrap();
+        let sting_probe = MediaProbe {
+            duration_ms: 5_000,
+            container_name: "mov,mp4,m4a,3gp,3g2,mj2".to_owned(),
+            file_size_bytes: fs::metadata(&sting_source).unwrap().len(),
+            video: VideoProbe {
+                stream_index: 0,
+                codec: "h264".to_owned(),
+                raw_width: 832,
+                raw_height: 832,
+                display_width: 832,
+                display_height: 832,
+                rotation_degrees: 0,
+                avg_frame_rate: Some(24.0),
+                real_frame_rate: Some(24.0),
+                pixel_format: Some("yuv420p".to_owned()),
+                sample_aspect_ratio: Some("1:1".to_owned()),
+            },
+            has_audio: true,
+            audio: Some(AudioProbe {
+                stream_index: 1,
+                codec: "aac".to_owned(),
+                sample_rate: Some(48_000),
+                channels: Some(2),
+                channel_layout: Some("stereo".to_owned()),
+            }),
+            warnings: Vec::new(),
+        };
+        let (sting, sting_path) =
+            store_sting_asset(&project_path, &sting_source, &sting_probe).unwrap();
+        assert_eq!(
+            sting.relative_path,
+            format!("assets/stings/{}.mp4", sting.sha256)
+        );
+        assert!(sting_path.is_file());
 
         fs::remove_dir_all(root).unwrap();
     }

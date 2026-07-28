@@ -218,6 +218,17 @@ pub async fn load_project(
         app.asset_protocol_scope()
             .allow_file(asset_path)
             .map_err(|_| AppError::internal("A project asset preview could not be authorized."))?;
+        if let Some((sting, _)) = overlay.sting() {
+            let preview_path = crate::services::assets::resolve_project_asset_path(
+                PathBuf::from(&response.project_path).as_path(),
+                &sting.preview.relative_path,
+            )?;
+            app.asset_protocol_scope()
+                .allow_file(preview_path)
+                .map_err(|_| {
+                    AppError::internal("A sting preview sprite could not be authorized.")
+                })?;
+        }
     }
     record_recent(
         &app,

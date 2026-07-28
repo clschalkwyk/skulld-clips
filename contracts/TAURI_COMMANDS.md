@@ -13,6 +13,7 @@
 ```ts
 select_media_file(): string | null
 select_overlay_file(): string | null
+select_sting_file(): string | null
 select_export_destination({ suggestedName: string }): string | null
 select_diagnostic_destination({ suggestedName: string }): string | null
 select_project_file(): string | null
@@ -117,6 +118,21 @@ output: AssetRef
 ```
 
 Initial payload cap: 10 MiB. Replace with temp-file/binary IPC only if real usage requires it.
+
+## `import_sting_asset`
+
+```ts
+input: { projectPath: string; sourceAssetPath: string }
+output: StingAssetRef
+```
+
+Accept one user-selected square MP4 up to 50 MiB and 10 seconds, probe it through the
+Rust-owned media boundary, copy it into `assets/stings`, and record its content
+hash, dimensions, duration, and audio presence. Rust also creates a bounded
+transparent PNG preview sprite with the same fixed chroma-key profile. The frontend may select the
+fixed `toasty-right` preset and whether the verified clip audio is included; it
+may not supply a chroma-key expression, playback-rate expression, filter
+fragment, or FFmpeg argument.
 
 ## `validate_export`
 

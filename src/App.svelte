@@ -29,10 +29,12 @@
   import {
     createCaptionOverlay,
     createImageOverlay,
+    createStingOverlay,
     DEFAULT_CAPTION_STYLE,
     nextZIndex,
     reorderOverlay,
     replaceOverlayAsset,
+    replaceStingAsset,
   } from "./services/overlay-model";
   import {
     cancelExport,
@@ -40,6 +42,7 @@
     createProject,
     getRuntimeInfo,
     importOverlayAsset,
+    importStingAsset,
     listRecentProjects,
     listenForExportEvents,
     listenForFileDrops,
@@ -54,6 +57,7 @@
     selectDiagnosticDestination,
     selectMediaFile,
     selectOverlayFile,
+    selectStingFile,
     selectProjectFile,
     startExport,
     validateExport,
@@ -563,6 +567,52 @@
     }
   }
 
+  async function addStingOverlay(): Promise<void> {
+    if (!session || session.sourceStatus !== "ok" || overlayBusy) {
+      return;
+    }
+    if (session.project.overlays.some((overlay) => overlay.type === "sting")) {
+      actionError = {
+        code: "E_INVALID_ARGUMENT",
+        message: "This project already has a Skull'd sting.",
+        safeDetail: "Select the sting layer to replace or retime it.",
+        retryable: false,
+      };
+      return;
+    }
+    actionError = null;
+    try {
+      const sourceAssetPath = await selectStingFile();
+      if (!sourceAssetPath || !session) {
+        return;
+      }
+      overlayBusy = true;
+      const asset = await importStingAsset(session.projectPath, sourceAssetPath);
+      const overlay = createStingOverlay(
+        crypto.randomUUID(),
+        asset,
+        session.project.timeline.inMs,
+        session.project.timeline.outMs,
+        nextZIndex(session.project.overlays),
+      );
+      session.project.overlays.push(overlay);
+      selectOverlay(overlay.id);
+      markProjectDirty();
+    } catch (error) {
+      actionError =
+        error instanceof Error
+          ? {
+              code: "E_INVALID_ARGUMENT",
+              message: "The Skull'd sting could not be added.",
+              safeDetail: error.message,
+              retryable: false,
+            }
+          : normalizeAppError(error);
+    } finally {
+      overlayBusy = false;
+    }
+  }
+
   async function replaceImageOverlay(id: string): Promise<void> {
     if (!session || session.sourceStatus !== "ok" || overlayBusy) {
       return;
@@ -580,6 +630,30 @@
         return;
       }
       updateOverlay(replaceOverlayAsset(overlay, asset));
+    } catch (error) {
+      actionError = normalizeAppError(error);
+    } finally {
+      overlayBusy = false;
+    }
+  }
+
+  async function replaceStingOverlay(id: string): Promise<void> {
+    if (!session || session.sourceStatus !== "ok" || overlayBusy) {
+      return;
+    }
+    actionError = null;
+    try {
+      const sourceAssetPath = await selectStingFile();
+      if (!sourceAssetPath || !session) {
+        return;
+      }
+      overlayBusy = true;
+      const asset = await importStingAsset(session.projectPath, sourceAssetPath);
+      const overlay = session.project.overlays.find(({ id: candidate }) => candidate === id);
+      if (!overlay || overlay.type !== "sting") {
+        return;
+      }
+      updateOverlay(replaceStingAsset(overlay, asset));
     } catch (error) {
       actionError = normalizeAppError(error);
     } finally {
@@ -608,7 +682,7 @@
     const overlay = session?.project.overlays.find(
       ({ id: candidate }) => candidate === id,
     );
-    if (!overlay || overlay.type === "image") {
+    if (!overlay || overlay.type !== "caption") {
       captionStatus = "idle";
     }
   }
@@ -742,8 +816,19 @@
     }
     const { inMs, outMs } = session.project.timeline;
     for (const overlay of session.project.overlays) {
-      const start = Math.max(inMs, Math.min(overlay.startMs, outMs - 1));
-      const end = Math.min(outMs, Math.max(overlay.endMs, start + 1));
+      const minimumDuration = overlay.type === "sting" ? 500 : 1;
+      const start = Math.max(
+        inMs,
+        Math.min(overlay.startMs, outMs - minimumDuration),
+      );
+      const maximumEnd =
+        overlay.type === "sting"
+          ? Math.min(outMs, start + Math.floor(overlay.asset.durationMs / 3))
+          : outMs;
+      const end = Math.min(
+        maximumEnd,
+        Math.max(overlay.endMs, start + minimumDuration),
+      );
       overlay.startMs = start;
       overlay.endMs = end;
     }
@@ -754,8 +839,13 @@
       return;
     }
     const timeline = session.project.timeline;
+    const minimumDuration = session.project.overlays.some(
+      (overlay) => overlay.type === "sting",
+    )
+      ? 500
+      : 250;
     timeline.inMs = setTrimIn(
-      requestedMs,
+      Math.min(requestedMs, timeline.outMs - minimumDuration),
       timeline.outMs,
       session.project.source.probe.durationMs,
     );
@@ -769,8 +859,13 @@
       return;
     }
     const timeline = session.project.timeline;
+    const minimumDuration = session.project.overlays.some(
+      (overlay) => overlay.type === "sting",
+    )
+      ? 500
+      : 250;
     timeline.outMs = setTrimOut(
-      requestedMs,
+      Math.max(requestedMs, timeline.inMs + minimumDuration),
       timeline.inMs,
       session.project.source.probe.durationMs,
     );
@@ -1090,6 +1185,7 @@
           busy={overlayBusy || session.sourceStatus !== "ok"}
           onSelect={selectOverlay}
           onAddImage={addImageOverlay}
+          onAddSting={addStingOverlay}
           onAddCaption={addCaptionOverlay}
         />
       </aside>
@@ -1136,6 +1232,7 @@
             onChange={updateOverlay}
             onCaptionChange={updateCaptionOverlay}
             onReplaceImage={replaceImageOverlay}
+            onReplaceSting={replaceStingOverlay}
             onReorder={moveOverlayInStack}
             onDelete={deleteOverlay}
           />
@@ -1182,7 +1279,7 @@
     />
 
     <footer class="editor-footer">
-      <span>Milestone 5 · Hardened local clip workflow</span>
+      <span>Milestone 6 · Skull’d sting workflow</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
 

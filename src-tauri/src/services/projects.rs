@@ -106,6 +106,7 @@ pub fn create_project(
     for relative in [
         "assets/overlays",
         "assets/captions",
+        "assets/stings",
         "cache",
         "renders/.partial",
         "diagnostics",

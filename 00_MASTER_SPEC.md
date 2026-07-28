@@ -7,7 +7,7 @@ Skull’d Clip Forge is a local-first desktop application that converts a raw ga
 1. Import a local clip.
 2. Select an in/out range.
 3. Position a locked 9:16 crop.
-4. Add a hook caption and optional image branding.
+4. Add a hook caption, optional image branding, and an optional Skull’d sting.
 5. Export a verified 1080×1920 MP4.
 
 The application uses a Svelte 5 frontend inside Tauri 2. Rust owns project persistence, path authorization, ffprobe, FFmpeg execution, progress, cancellation and output verification. User media never needs to leave the device.
@@ -39,9 +39,9 @@ The MVP will not include:
 - speech-to-text;
 - multiple source clips;
 - transitions;
-- audio mixing;
+- general-purpose audio mixing;
 - waveform editing;
-- animated overlays;
+- arbitrary animated overlays or multiple video tracks;
 - mobile apps;
 - a plugin ecosystem;
 - arbitrary shell execution from JavaScript.
@@ -75,7 +75,7 @@ The architecture remains cross-platform, but Windows is the first release gate.
 | Output dimensions | Exactly 1080×1920 |
 | Output container | MP4 |
 | Video baseline | H.264, yuv420p |
-| Audio baseline | AAC when source audio exists |
+| Audio baseline | AAC when source or enabled sting audio exists |
 | Network dependency | None |
 | Active export jobs | 1 |
 | Progress update interval | At least once per second while encoding |
@@ -93,10 +93,11 @@ The architecture remains cross-platform, but Windows is the first release gate.
 6. Pan/zoom the crop.
 7. Add a caption.
 8. Add the Skull’d logo/mascot image if desired.
-9. Choose filename and output location.
-10. Export.
-11. Rust parses progress, verifies the partial result, then atomically renames it.
-12. Reveal the final file in Explorer/Finder.
+9. Add one optional Skull’d sting if desired.
+10. Choose filename and output location.
+11. Export.
+12. Rust parses progress, verifies the partial result, then atomically renames it.
+13. Reveal the final file in Explorer/Finder.
 
 ## 8. Functional requirements
 
@@ -194,6 +195,22 @@ Allow styled hook captions with:
 
 Captions are rasterized by the frontend to transparent PNG. User text is never inserted into an FFmpeg filter expression.
 
+### FR-007A — Constrained Skull’d sting
+
+Allow at most one user-selected MP4 sting with the fixed `toasty-right` preset.
+
+On import:
+
+- accept a square MP4 no larger than 50 MiB, 10 seconds, or 4096×4096;
+- probe it through the Rust-owned ffprobe boundary;
+- copy it into project assets and calculate SHA-256;
+- record duration, dimensions, MIME type, and audio presence.
+
+The preset owns the green chroma key, 3× playback, right-edge entrance/exit,
+and safe default placement. The user may move, resize, retime, rename, change
+opacity, and enable or disable verified sting audio. The frontend never supplies
+chroma-key values, playback expressions, filters, or FFmpeg arguments.
+
 ### FR-008 — Preview
 
 Show:
@@ -202,6 +219,7 @@ Show:
 - crop frame;
 - dimmed outside region;
 - currently visible overlays;
+- the keyed sting frame and fixed entrance/exit motion;
 - safe-area guides;
 - timeline/playhead.
 
@@ -266,6 +284,7 @@ Create an explicit diagnostic ZIP containing sanitized logs, runtime versions an
     assets/
       overlays/
       captions/
+      stings/
     cache/
       thumbnails/
       preview/
@@ -278,6 +297,7 @@ Rules:
 
 - source clips remain external;
 - imported overlays are copied;
+- imported stings are copied, hashed, probed and bounded;
 - caption assets are content-addressed;
 - cache is disposable;
 - final exports may go to any user-approved destination;
@@ -375,13 +395,14 @@ Commands remain thin. Domain validation and FFmpeg construction must be pure and
 5. Crop source.
 6. Scale to 1080×1920.
 7. Reset sample aspect ratio.
-8. Composite overlay PNGs in z-order and visibility windows.
-9. Encode H.264/AAC.
-10. Write partial MP4.
-11. ffprobe the partial.
-12. Verify dimensions, duration and streams.
-13. Atomically rename.
-14. Emit completed event.
+8. Composite raster overlays and the optional fixed-preset keyed sting in z-order.
+9. Mix optional sting audio through the Rust-owned fixed graph.
+10. Encode H.264/AAC.
+11. Write partial MP4.
+12. ffprobe the partial.
+13. Verify dimensions, duration and streams.
+14. Atomically rename.
+15. Emit completed event.
 
 ## 15. Error codes
 
@@ -435,7 +456,7 @@ MVP is complete when a user can, fully offline:
 1. Import a supported gameplay clip.
 2. Select a 10–30 second range.
 3. Set the 9:16 crop.
-4. Add caption and logo.
+4. Add caption and logo, with an optional Skull’d sting.
 5. Export a verified 1080×1920 MP4.
 6. Cancel cleanly.
 7. Reopen without losing edits.
@@ -468,8 +489,8 @@ MVP is complete when a user can, fully offline:
 
 ### 1.2
 
-- mascot timeline events;
-- animated WebM overlays;
+- multiple mascot timeline events;
+- arbitrary animated WebM overlays;
 - blurred-background mode;
 - optional hardware encoders.
 

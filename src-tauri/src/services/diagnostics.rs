@@ -234,6 +234,7 @@ fn redacted_project_metadata(project_path: &Path) -> Value {
             let kind = match overlay {
                 Overlay::Image { .. } => "image",
                 Overlay::Caption { .. } => "caption",
+                Overlay::Sting { .. } => "sting",
             };
             json!({
                 "type": kind,

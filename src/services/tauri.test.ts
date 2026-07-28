@@ -7,6 +7,7 @@ import {
   createProject,
   getRuntimeInfo,
   importOverlayAsset,
+  importStingAsset,
   loadProject,
   normalizeAppError,
   projectAssetPath,
@@ -104,6 +105,11 @@ describe("project commands", () => {
       120,
       invokeCommand,
     );
+    await importStingAsset(
+      "/projects/id/project.skcf.json",
+      "/art/sting.mp4",
+      invokeCommand,
+    );
 
     expect(invokeCommand).toHaveBeenNthCalledWith(1, "import_overlay_asset", {
       projectPath: "/projects/id/project.skcf.json",
@@ -115,6 +121,10 @@ describe("project commands", () => {
       pngBytesBase64: "cG5n",
       width: 400,
       height: 120,
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(3, "import_sting_asset", {
+      projectPath: "/projects/id/project.skcf.json",
+      sourceAssetPath: "/art/sting.mp4",
     });
     expect(
       projectAssetPath(

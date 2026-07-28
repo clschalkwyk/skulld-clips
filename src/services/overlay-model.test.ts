@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { AssetRef, Overlay } from "../../contracts/types";
+import type { AssetRef, Overlay, StingAssetRef } from "../../contracts/types";
 import {
   createImageOverlay,
+  createStingOverlay,
   isOverlayVisible,
   moveOverlay,
   reorderOverlay,
   resizeOverlay,
+  stingDisplayX,
 } from "./overlay-model";
 
 const asset: AssetRef = {
@@ -16,6 +18,28 @@ const asset: AssetRef = {
   height: 400,
   mimeType: "image/png",
   originalFilename: "logo.png",
+};
+const stingAsset: StingAssetRef = {
+  ...asset,
+  relativePath: "assets/stings/sting.mp4",
+  mimeType: "video/mp4",
+  originalFilename: "skulld-sting.mp4",
+  width: 832,
+  height: 832,
+  durationMs: 5_042,
+  hasAudio: true,
+  preview: {
+    relativePath: "assets/stings/sting.preview.png",
+    sha256: "b".repeat(64),
+    width: 960,
+    height: 768,
+    frameWidth: 192,
+    frameHeight: 192,
+    columns: 5,
+    rows: 4,
+    frameCount: 20,
+    framesPerSecond: 12,
+  },
 };
 
 describe("overlay model", () => {
@@ -72,5 +96,27 @@ describe("overlay model", () => {
       { id: "a", zIndex: 1 },
       { id: "c", zIndex: 2 },
     ]);
+  });
+
+  it("creates the fixed Toasty-right sting and computes its entrance and exit", () => {
+    const overlay = createStingOverlay(
+      "00000000-0000-4000-8000-000000000001",
+      stingAsset,
+      1_000,
+      10_000,
+      2,
+    );
+
+    expect(overlay.startMs).toBe(3_000);
+    expect(overlay.endMs).toBe(4_680);
+    expect(overlay.position).toEqual({
+      x: 0.57037,
+      y: 0.729167,
+      width: 0.407407,
+      height: 0.229167,
+    });
+    expect(stingDisplayX(overlay, 3_000)).toBe(1);
+    expect(stingDisplayX(overlay, 3_180)).toBeCloseTo(overlay.position.x);
+    expect(stingDisplayX(overlay, 4_680)).toBe(1);
   });
 });

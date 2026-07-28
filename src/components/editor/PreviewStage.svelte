@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import StingPreview from "./StingPreview.svelte";
 
   import type {
     AssetRef,
@@ -25,6 +26,7 @@
     moveOverlay,
     overlayAsset,
     resizeOverlay,
+    stingDisplayX,
   } from "../../services/overlay-model";
   import { projectAssetPreviewUrl } from "../../services/tauri";
 
@@ -236,8 +238,10 @@
 
   function overlayStyle(overlay: Overlay): string {
     const position = overlay.position;
+    const displayX =
+      overlay.type === "sting" ? stingDisplayX(overlay, playheadMs) : position.x;
     return [
-      `left:${cropPixels.x + position.x * cropPixels.width}px`,
+      `left:${cropPixels.x + displayX * cropPixels.width}px`,
       `top:${cropPixels.y + position.y * cropPixels.height}px`,
       `width:${position.width * cropPixels.width}px`,
       `height:${position.height * cropPixels.height}px`,
@@ -379,16 +383,31 @@
         onkeydown={(event) => handleOverlayKey(event, overlay)}
         onclick={() => onOverlaySelect(overlay.id)}
       >
-        <img
-          src={projectAssetPreviewUrl(
-            projectPath,
-            overlayAsset(overlay).relativePath,
-          )}
-          alt=""
-          draggable="false"
-          onerror={() =>
-            onPreviewError("A project overlay could not be displayed.")}
-        />
+        {#if overlay.type === "sting"}
+          <StingPreview
+            src={projectAssetPreviewUrl(
+              projectPath,
+              overlay.asset.preview.relativePath,
+            )}
+            preview={overlay.asset.preview}
+            startMs={overlay.startMs}
+            {playheadMs}
+            onReady={() => onPreviewError(null)}
+            onError={() =>
+              onPreviewError("The generated Skull'd sting preview could not be displayed.")}
+          />
+        {:else}
+          <img
+            src={projectAssetPreviewUrl(
+              projectPath,
+              overlayAsset(overlay).relativePath,
+            )}
+            alt=""
+            draggable="false"
+            onerror={() =>
+              onPreviewError("A project overlay could not be displayed.")}
+          />
+        {/if}
         <span
           class="overlay-resize-handle"
           role="presentation"

@@ -27,6 +27,15 @@ Feature: Build a branded vertical gameplay clip
     And a video stream exists
     And absence of audio is accepted
 
+  Scenario: Constrained Skull'd sting
+    Given I import a valid green-screen MP4 sting
+    And I place it inside the active range
+    When I export using the Toasty-right preset with sting audio enabled
+    Then the sting enters from the right at 3 times source speed
+    And its green background is keyed out
+    And its audio is mixed without clipping
+    And no frozen sting frame remains after its end time
+
   Scenario: Cancel
     Given a valid export is running
     When I cancel it

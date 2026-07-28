@@ -66,6 +66,31 @@ pub struct AssetRef {
     pub original_filename: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StingAssetRef {
+    #[serde(flatten)]
+    pub asset: AssetRef,
+    pub duration_ms: u64,
+    pub has_audio: bool,
+    pub preview: StingPreviewRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StingPreviewRef {
+    pub relative_path: String,
+    pub sha256: String,
+    pub width: u32,
+    pub height: u32,
+    pub frame_width: u32,
+    pub frame_height: u32,
+    pub columns: u32,
+    pub rows: u32,
+    pub frame_count: u32,
+    pub frames_per_second: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OverlayBase {
@@ -93,12 +118,22 @@ pub enum Overlay {
         #[serde(rename = "generatedAsset")]
         generated_asset: AssetRef,
     },
+    Sting {
+        #[serde(flatten)]
+        base: OverlayBase,
+        asset: StingAssetRef,
+        preset: StingPreset,
+        #[serde(rename = "includeAudio")]
+        include_audio: bool,
+    },
 }
 
 impl Overlay {
     pub fn base(&self) -> &OverlayBase {
         match self {
-            Self::Image { base, .. } | Self::Caption { base, .. } => base,
+            Self::Image { base, .. } | Self::Caption { base, .. } | Self::Sting { base, .. } => {
+                base
+            }
         }
     }
 
@@ -108,6 +143,18 @@ impl Overlay {
             Self::Caption {
                 generated_asset, ..
             } => (generated_asset, ProjectAssetKind::Caption),
+            Self::Sting { asset, .. } => (&asset.asset, ProjectAssetKind::Sting),
+        }
+    }
+
+    pub fn sting(&self) -> Option<(&StingAssetRef, bool)> {
+        match self {
+            Self::Sting {
+                asset,
+                include_audio,
+                ..
+            } => Some((asset, *include_audio)),
+            Self::Image { .. } | Self::Caption { .. } => None,
         }
     }
 }
@@ -116,6 +163,13 @@ impl Overlay {
 pub enum ProjectAssetKind {
     Overlay,
     Caption,
+    Sting,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StingPreset {
+    #[serde(rename = "toasty-right")]
+    ToastyRight,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -279,16 +333,27 @@ impl ProjectV1 {
             ));
         }
         let mut overlay_ids = HashSet::with_capacity(self.overlays.len());
+        let mut sting_count = 0_u8;
         for overlay in &self.overlays {
             validate_overlay(overlay, self.timeline.in_ms, self.timeline.out_ms)?;
             let id = match overlay {
-                Overlay::Image { base, .. } | Overlay::Caption { base, .. } => &base.id,
+                Overlay::Image { base, .. }
+                | Overlay::Caption { base, .. }
+                | Overlay::Sting { base, .. } => &base.id,
             };
             if !overlay_ids.insert(id) {
                 return Err(AppError::invalid_argument(
                     "Overlay IDs must be unique within a project.",
                 ));
             }
+            if matches!(overlay, Overlay::Sting { .. }) {
+                sting_count += 1;
+            }
+        }
+        if sting_count > 1 {
+            return Err(AppError::invalid_argument(
+                "A project may contain at most one Skull'd sting.",
+            ));
         }
         validate_export_settings(&self.export_defaults)
     }
@@ -428,6 +493,15 @@ fn validate_overlay(
             validate_caption(caption)?;
             (base, generated_asset, "assets/captions", Some("image/png"))
         }
+        Overlay::Sting {
+            base,
+            asset,
+            include_audio,
+            ..
+        } => {
+            validate_sting(asset, base, *include_audio)?;
+            (base, &asset.asset, "assets/stings", Some("video/mp4"))
+        }
     };
 
     if Uuid::parse_str(&base.id).is_err()
@@ -451,6 +525,66 @@ fn validate_overlay(
     {
         return Err(AppError::project_schema(
             "Overlay assets must remain in their matching project asset folder.",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_sting(
+    asset: &StingAssetRef,
+    base: &OverlayBase,
+    include_audio: bool,
+) -> Result<(), AppError> {
+    let overlay_duration = base.end_ms.saturating_sub(base.start_ms);
+    let available_duration = asset.duration_ms.div_ceil(3);
+    let aspect_ratio = f64::from(asset.asset.width) / f64::from(asset.asset.height);
+    if !(1_500..=10_000).contains(&asset.duration_ms)
+        || asset.asset.width > 4096
+        || asset.asset.height > 4096
+        || !(0.9..=1.1).contains(&aspect_ratio)
+        || overlay_duration < 500
+        || overlay_duration > available_duration
+        || (include_audio && !asset.has_audio)
+    {
+        return Err(AppError::invalid_argument(
+            "The Skull'd sting must fit its probed media and fixed Toasty-right preset.",
+        ));
+    }
+    let preview = &asset.preview;
+    let preview_path = Path::new(&preview.relative_path);
+    let preview_contained = !preview_path.is_absolute()
+        && preview_path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_) | Component::CurDir));
+    let frame_capacity = preview.columns.saturating_mul(preview.rows);
+    let previous_row_capacity = preview
+        .rows
+        .saturating_sub(1)
+        .saturating_mul(preview.columns);
+    if !preview_contained
+        || !preview_path.starts_with("assets/stings")
+        || preview_path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            != Some("png")
+        || !is_sha256(&preview.sha256)
+        || preview.frame_width != 192
+        || preview.frame_height != 192
+        || preview.frames_per_second != 12
+        || !(1..=8).contains(&preview.columns)
+        || !(1..=8).contains(&preview.rows)
+        || !(6..=40).contains(&preview.frame_count)
+        || preview.frame_count
+            != u32::try_from(asset.duration_ms.saturating_mul(4) / 1_000)
+                .unwrap_or(40)
+                .clamp(6, 40)
+        || preview.frame_count > frame_capacity
+        || preview.frame_count <= previous_row_capacity
+        || preview.width != preview.columns * preview.frame_width
+        || preview.height != preview.rows * preview.frame_height
+    {
+        return Err(AppError::project_schema(
+            "The Skull'd sting preview sprite metadata is invalid.",
         ));
     }
     Ok(())
@@ -585,6 +719,15 @@ mod tests {
         let project: ProjectV1 =
             serde_json::from_str(include_str!("../../../examples/example-project.skcf.json"))
                 .unwrap();
+        project.validate().unwrap();
+    }
+
+    #[test]
+    fn authoritative_sting_example_parses_and_passes_cross_field_validation() {
+        let project: ProjectV1 = serde_json::from_str(include_str!(
+            "../../../examples/example-sting-project.skcf.json"
+        ))
+        .unwrap();
         project.validate().unwrap();
     }
 }

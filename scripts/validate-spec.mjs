@@ -28,6 +28,7 @@ for (const path of [
   "contracts/project.schema.json",
   "contracts/export-events.schema.json",
   "examples/example-project.skcf.json",
+  "examples/example-sting-project.skcf.json",
   "release/RELEASE_MANIFEST.schema.json",
 ]) {
   JSON.parse(readFileSync(path, "utf8"));

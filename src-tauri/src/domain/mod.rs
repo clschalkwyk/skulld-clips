@@ -12,7 +12,9 @@ pub use export::{
 pub use media::{AudioProbe, MediaProbe, VideoProbe};
 pub use project::{
     centered_crop, AssetRef, Canvas, ExportSettings, FrameRateMode, NormalizedRect, Overlay,
-    ProjectAssetKind, ProjectSource, ProjectV1, QualityMode, SourceFingerprint, Timeline,
-    MIN_TRIM_DURATION_MS, PROJECT_FILENAME, PROJECT_SCHEMA_VERSION,
+    ProjectAssetKind, ProjectSource, ProjectV1, QualityMode, SourceFingerprint, StingAssetRef,
+    StingPreviewRef, Timeline, MIN_TRIM_DURATION_MS, PROJECT_FILENAME, PROJECT_SCHEMA_VERSION,
 };
+#[cfg(test)]
+pub use project::{OverlayBase, StingPreset};
 pub use runtime::RuntimeInfo;

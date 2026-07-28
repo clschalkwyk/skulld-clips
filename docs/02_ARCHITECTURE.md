@@ -46,6 +46,7 @@ Thin adapters that:
 - schema migration;
 - fingerprint checks;
 - asset imports;
+- bounded sting MP4 import/probe;
 - cache cleanup.
 
 ### Probe service
@@ -116,6 +117,10 @@ Allowed paths are:
 - user-approved export destination.
 
 Canonicalize where possible. Project-relative assets may not escape project root through `..`, symlink or crafted JSON.
+
+The optional sting is a constrained asset type rather than a general video
+track. Rust fixes its chroma key, 3× playback, entrance/exit motion and audio
+mix graph. Svelte may select the preset and audio inclusion only.
 
 ## Sidecar layout
 

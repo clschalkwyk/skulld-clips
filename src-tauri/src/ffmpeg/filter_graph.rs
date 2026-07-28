@@ -25,6 +25,15 @@ pub fn resolved_frame_rate(project: &ProjectV1, mode: FrameRateMode) -> u32 {
     }
 }
 
+pub fn output_has_audio(project: &ProjectV1) -> bool {
+    project.source.probe.has_audio
+        || project.overlays.iter().any(|overlay| {
+            overlay
+                .sting()
+                .is_some_and(|(asset, include)| include && asset.has_audio)
+        })
+}
+
 pub fn build_filter_graph(project: &ProjectV1, frame_rate: u32) -> String {
     let probe = &project.source.probe;
     let crop = crop_to_display_pixels(
@@ -61,13 +70,26 @@ pub fn build_filter_graph(project: &ProjectV1, frame_rate: u32) -> String {
         let base = overlay.base();
         let position = overlay_to_canvas_pixels(&base.position);
         let asset_label = format!("overlay{index}");
-        filters.push(format!(
-            "[{}:v]format=rgba,scale={}:{}:flags=lanczos,colorchannelmixer=aa={}[{asset_label}]",
-            index + 1,
-            position.width,
-            position.height,
-            decimal(base.opacity)
-        ));
+        let input_index = index + 1;
+        if matches!(overlay, Overlay::Sting { .. }) {
+            let relative_start_ms = base.start_ms - project.timeline.in_ms;
+            let source_window_ms = (base.end_ms - base.start_ms) * 3;
+            filters.push(format!(
+                "[{input_index}:v:0]trim=start=0:end={},setpts=(PTS-STARTPTS)/3+{}/TB,chromakey=0x06EE11:0.160000:0.050000,format=rgba,scale={}:{}:flags=lanczos,colorchannelmixer=aa={}[{asset_label}]",
+                seconds(source_window_ms),
+                seconds(relative_start_ms),
+                position.width,
+                position.height,
+                decimal(base.opacity)
+            ));
+        } else {
+            filters.push(format!(
+                "[{input_index}:v]format=rgba,scale={}:{}:flags=lanczos,colorchannelmixer=aa={}[{asset_label}]",
+                position.width,
+                position.height,
+                decimal(base.opacity)
+            ));
+        }
         let input_label = if index == 0 {
             "v0".to_owned()
         } else {
@@ -78,24 +100,92 @@ pub fn build_filter_graph(project: &ProjectV1, frame_rate: u32) -> String {
         } else {
             format!("v{}", index + 1)
         };
-        filters.push(format!(
-            "[{input_label}][{asset_label}]overlay={}:{}:enable='between(t,{},{})':eof_action=pass:shortest=0:repeatlast=1[{output_label}]",
-            position.x,
-            position.y,
-            seconds(base.start_ms - project.timeline.in_ms),
-            seconds(base.end_ms - project.timeline.in_ms),
-        ));
+        let relative_start_ms = base.start_ms - project.timeline.in_ms;
+        let relative_end_ms = base.end_ms - project.timeline.in_ms;
+        if matches!(overlay, Overlay::Sting { .. }) {
+            let x_expression = sting_x_expression(position.x, relative_start_ms, relative_end_ms);
+            filters.push(format!(
+                "[{input_label}][{asset_label}]overlay=x='{x_expression}':y={}:enable='between(t,{},{})':eof_action=pass:shortest=0:repeatlast=0[{output_label}]",
+                position.y,
+                seconds(relative_start_ms),
+                seconds(relative_end_ms),
+            ));
+        } else {
+            filters.push(format!(
+                "[{input_label}][{asset_label}]overlay={}:{}:enable='between(t,{},{})':eof_action=pass:shortest=0:repeatlast=1[{output_label}]",
+                position.x,
+                position.y,
+                seconds(relative_start_ms),
+                seconds(relative_end_ms),
+            ));
+        }
     }
 
-    if let Some(audio) = &probe.audio {
-        filters.push(format!(
+    let sting_audio = overlays
+        .iter()
+        .enumerate()
+        .find_map(|(index, overlay)| match overlay {
+            Overlay::Sting {
+                base,
+                asset,
+                include_audio: true,
+                ..
+            } if asset.has_audio => Some((index + 1, base)),
+            Overlay::Image { .. } | Overlay::Caption { .. } | Overlay::Sting { .. } => None,
+        });
+    match (&probe.audio, sting_audio) {
+        (Some(audio), Some((input_index, base))) => {
+            let relative_start_ms = base.start_ms - project.timeline.in_ms;
+            let relative_end_ms = base.end_ms - project.timeline.in_ms;
+            let source_window_ms = (base.end_ms - base.start_ms) * 3;
+            filters.push(format!(
+                "[0:{}]atrim=start={}:end={},asetpts=PTS-STARTPTS,volume=0.720000:enable='between(t,{},{})'[amain]",
+                audio.stream_index,
+                seconds(project.timeline.in_ms),
+                seconds(project.timeline.out_ms),
+                seconds(relative_start_ms),
+                seconds(relative_end_ms),
+            ));
+            filters.push(format!(
+                "[{input_index}:a:0]atrim=start=0:end={},asetpts=PTS-STARTPTS,atempo=1.5,atempo=2.0,adelay={relative_start_ms}:all=1[asting]",
+                seconds(source_window_ms),
+            ));
+            filters.push(
+                "[amain][asting]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.950000[aout]"
+                    .to_owned(),
+            );
+        }
+        (Some(audio), None) => filters.push(format!(
             "[0:{}]atrim=start={}:end={},asetpts=PTS-STARTPTS[aout]",
             audio.stream_index,
             seconds(project.timeline.in_ms),
             seconds(project.timeline.out_ms)
-        ));
+        )),
+        (None, Some((input_index, base))) => {
+            let relative_start_ms = base.start_ms - project.timeline.in_ms;
+            let source_window_ms = (base.end_ms - base.start_ms) * 3;
+            filters.push(format!(
+                "[{input_index}:a:0]atrim=start=0:end={},asetpts=PTS-STARTPTS,atempo=1.5,atempo=2.0,adelay={relative_start_ms}:all=1,apad=whole_dur={},atrim=end={}[aout]",
+                seconds(source_window_ms),
+                seconds(project.timeline.out_ms - project.timeline.in_ms),
+                seconds(project.timeline.out_ms - project.timeline.in_ms),
+            ));
+        }
+        (None, None) => {}
     }
     filters.join(";")
+}
+
+fn sting_x_expression(x: u32, start_ms: u64, end_ms: u64) -> String {
+    let entry_end_ms = start_ms + 180;
+    let exit_start_ms = end_ms - 120;
+    format!(
+        "if(lt(t,{}),W-(t-{})/0.180000*(W-{x}),if(gt(t,{}),{x}+(t-{})/0.120000*(W-{x}),{x}))",
+        seconds(entry_end_ms),
+        seconds(start_ms),
+        seconds(exit_start_ms),
+        seconds(exit_start_ms),
+    )
 }
 
 fn orientation_filter(rotation_degrees: u16) -> Option<String> {

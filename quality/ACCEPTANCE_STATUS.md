@@ -7,6 +7,7 @@ not turn an unsigned internal package into a public release.
 |---|---|---|
 | Happy path with caption and logo | Covered | real H.264/AAC export, two raster overlays, decoded-frame position/color assertions, stream/dimension/duration verification |
 | Silent source | Covered | generated silent source, two-overlay golden export and verified absence of audio |
+| Constrained Skull'd sting | Covered | generated green-screen MP4, fixed 3× right-edge motion, decoded keyed-frame and post-window assertions, mixed AAC and below-full-scale peak check |
 | Cancel | Covered | live FFmpeg process-tree termination and partial cleanup, registry and cancellation UI state tests |
 | Invalid trim | Covered | shared timeline and Rust project cross-field validation reject invalid or sub-250 ms ranges before argument generation |
 | Existing output | Covered | non-overwrite publication preserves existing bytes; overwrite is explicit in validation/UI |

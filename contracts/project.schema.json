@@ -383,6 +383,120 @@
         }
       }
     },
+    "stingAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath",
+        "sha256",
+        "width",
+        "height",
+        "mimeType",
+        "durationMs",
+        "hasAudio",
+        "preview"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "mimeType": {
+          "const": "video/mp4"
+        },
+        "originalFilename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 1500,
+          "maximum": 10000
+        },
+        "hasAudio": {
+          "type": "boolean"
+        },
+        "preview": {
+          "$ref": "#/$defs/stingPreview"
+        }
+      }
+    },
+    "stingPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relativePath",
+        "sha256",
+        "width",
+        "height",
+        "frameWidth",
+        "frameHeight",
+        "columns",
+        "rows",
+        "frameCount",
+        "framesPerSecond"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 192,
+          "maximum": 1536
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 192,
+          "maximum": 1536
+        },
+        "frameWidth": {
+          "const": 192
+        },
+        "frameHeight": {
+          "const": 192
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "frameCount": {
+          "type": "integer",
+          "minimum": 6,
+          "maximum": 40
+        },
+        "framesPerSecond": {
+          "const": 12
+        }
+      }
+    },
     "captionStyle": {
       "type": "object",
       "additionalProperties": false,
@@ -555,6 +669,37 @@
       ],
       "unevaluatedProperties": false
     },
+    "stingOverlay": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/overlayBase"
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "asset",
+            "preset",
+            "includeAudio"
+          ],
+          "properties": {
+            "type": {
+              "const": "sting"
+            },
+            "asset": {
+              "$ref": "#/$defs/stingAsset"
+            },
+            "preset": {
+              "const": "toasty-right"
+            },
+            "includeAudio": {
+              "type": "boolean"
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
     "overlay": {
       "oneOf": [
         {
@@ -562,6 +707,9 @@
         },
         {
           "$ref": "#/$defs/captionOverlay"
+        },
+        {
+          "$ref": "#/$defs/stingOverlay"
         }
       ]
     },

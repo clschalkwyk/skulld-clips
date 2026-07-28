@@ -10,6 +10,7 @@
 | M3 | SCF-030–034 | hashed project-owned image assets, overlay transform/timing/z-order and content-addressed raster captions |
 | M4 | SCF-040–046 | validation, pure graph/args, one process registry, progress, process-tree cancellation, partial verification and atomic publication |
 | M5 | SCF-050–055 | generated fixture/golden suite, redacted logs, diagnostic ZIP exclusions, stale cleanup and installed Windows export/package smoke |
+| M6 | SCF-056 | bounded project-owned MP4 sting, fixed Rust-owned green key/3× right-edge motion/audio mix, transparent sprite preview and decoded-frame/audio integration |
 
 ## Local gates
 
@@ -20,6 +21,7 @@ SKCF_RUN_MEDIA_INTEGRATION=1 cargo test \
 shasum -a 256 -c MANIFEST.sha256
 jq empty spec-manifest.json contracts/project.schema.json \
   contracts/export-events.schema.json examples/example-project.skcf.json \
+  examples/example-sting-project.skcf.json \
   release/RELEASE_MANIFEST.schema.json
 ```
 

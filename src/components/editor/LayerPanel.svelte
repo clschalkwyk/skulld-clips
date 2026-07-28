@@ -9,6 +9,7 @@
     busy?: boolean;
     onSelect: (id: string | null) => void;
     onAddImage: () => Promise<void>;
+    onAddSting: () => Promise<void>;
     onAddCaption: (text: string) => Promise<boolean>;
   }
 
@@ -19,6 +20,7 @@
     busy = false,
     onSelect,
     onAddImage,
+    onAddSting,
     onAddCaption,
   }: Props = $props();
 
@@ -29,6 +31,7 @@
   const orderedOverlays = $derived(
     [...overlays].sort((a, b) => b.zIndex - a.zIndex),
   );
+  const hasSting = $derived(overlays.some((overlay) => overlay.type === "sting"));
 
   async function createCaption(): Promise<void> {
     if (!captionText.trim() || addingCaption) {
@@ -60,6 +63,9 @@
 
 <div class="layer-actions">
   <button type="button" disabled={busy} onclick={onAddImage}>Add image</button>
+  <button type="button" disabled={busy || hasSting} onclick={onAddSting}>
+    {hasSting ? "Sting added" : "Add Skull’d sting"}
+  </button>
   <button
     type="button"
     disabled={busy}
@@ -106,7 +112,7 @@
 {#if overlays.length === 0}
   <div class="empty-panel">
     <strong>No overlays</strong>
-    <span>Add a caption or static brand image when the framing is ready.</span>
+    <span>Add a caption, static brand image, or the Skull’d sting when the framing is ready.</span>
   </div>
 {:else}
   <div class="layer-list" aria-label="Project overlays">

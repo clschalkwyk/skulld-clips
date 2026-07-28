@@ -70,6 +70,7 @@ Recent project card:
 │                      │ 9:16 crop + overlays        │ Trim          │
 │                      │                             │ Crop          │
 │                      │                             │ Caption/Image │
+│                      │                             │ Skull’d sting │
 ├──────────────────────┴─────────────────────────────┴───────────────┤
 │ Transport | range | playhead | overlay visibility bars             │
 └────────────────────────────────────────────────────────────────────┘
@@ -155,6 +156,17 @@ Image properties:
 - replace asset;
 - lock aspect;
 - reset position.
+
+Skull’d sting properties:
+
+- replace MP4;
+- fixed `toasty-right` motion preset;
+- include verified clip audio;
+- reset to the bottom-right safe placement.
+
+Only one sting is supported. Rust generates a bounded transparent PNG sprite
+with the fixed green-screen key for local preview; export remains authoritative
+and is covered by golden-frame tolerance.
 
 Caption properties:
 

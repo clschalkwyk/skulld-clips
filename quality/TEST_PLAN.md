@@ -17,6 +17,7 @@
 - trim controls;
 - crop inspector/stage synchronization;
 - overlay selection/timing;
+- constrained sting selection/audio/timing;
 - export validation;
 - cancellation UI;
 - relink flow.
@@ -84,6 +85,7 @@ For fixture projects:
 - ffprobe hang;
 - app closes during export;
 - missing overlay;
+- oversized/overlong/malformed sting;
 - malformed JSON;
 - newer schema;
 - source replacement.

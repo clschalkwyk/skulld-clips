@@ -7,6 +7,7 @@
   import {
     overlayAsset,
     resetOverlayPosition,
+    resetStingPosition,
     resizeOverlay,
   } from "../../services/overlay-model";
 
@@ -19,6 +20,7 @@
     onChange: (overlay: Overlay) => void;
     onCaptionChange: (id: string, caption: CaptionStyle) => void;
     onReplaceImage: (id: string) => Promise<void>;
+    onReplaceSting: (id: string) => Promise<void>;
     onReorder: (id: string, direction: -1 | 1) => void;
     onDelete: (id: string) => void;
   }
@@ -32,6 +34,7 @@
     onChange,
     onCaptionChange,
     onReplaceImage,
+    onReplaceSting,
     onReorder,
     onDelete,
   }: Props = $props();
@@ -59,16 +62,29 @@
   }
 
   function updateStart(value: number): void {
+    const minimumDuration = overlay.type === "sting" ? 500 : 1;
     onChange({
       ...overlay,
-      startMs: Math.round(clamp(value, timelineInMs, overlay.endMs - 1)),
+      startMs: Math.round(
+        clamp(value, timelineInMs, overlay.endMs - minimumDuration),
+      ),
     });
   }
 
   function updateEnd(value: number): void {
+    const minimumDuration = overlay.type === "sting" ? 500 : 1;
+    const maximumEnd =
+      overlay.type === "sting"
+        ? Math.min(
+            timelineOutMs,
+            overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
+          )
+        : timelineOutMs;
     onChange({
       ...overlay,
-      endMs: Math.round(clamp(value, overlay.startMs + 1, timelineOutMs)),
+      endMs: Math.round(
+        clamp(value, overlay.startMs + minimumDuration, maximumEnd),
+      ),
     });
   }
 
@@ -216,7 +232,7 @@
       <input
         type="number"
         min={timelineInMs}
-        max={overlay.endMs - 1}
+        max={overlay.endMs - (overlay.type === "sting" ? 500 : 1)}
         step="1"
         value={overlay.startMs}
         disabled={disabled}
@@ -227,8 +243,13 @@
       <span>End ms</span>
       <input
         type="number"
-        min={overlay.startMs + 1}
-        max={timelineOutMs}
+        min={overlay.startMs + (overlay.type === "sting" ? 500 : 1)}
+        max={overlay.type === "sting"
+          ? Math.min(
+              timelineOutMs,
+              overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
+            )
+          : timelineOutMs}
         step="1"
         value={overlay.endMs}
         disabled={disabled}
@@ -257,7 +278,7 @@
     <p class="asset-note">
       {overlay.asset.width} × {overlay.asset.height} · {overlay.asset.mimeType}
     </p>
-  {:else}
+  {:else if overlay.type === "caption"}
     <div class="caption-status" data-status={captionStatus} aria-live="polite">
       {captionStatus === "rendering"
         ? "Rendering caption…"
@@ -430,5 +451,41 @@
         />
       </label>
     {/if}
+  {:else}
+    <div class="asset-actions">
+      <button type="button" disabled={disabled} onclick={() => onReplaceSting(overlay.id)}>
+        Replace sting MP4
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onclick={() =>
+          onChange({
+            ...overlay,
+            position: resetStingPosition(overlay.asset),
+          })}
+      >
+        Reset safe placement
+      </button>
+    </div>
+    <label class="checkbox-control">
+      <input
+        type="checkbox"
+        checked={overlay.includeAudio}
+        disabled={disabled || !overlay.asset.hasAudio}
+        onchange={(event) =>
+          onChange({
+            ...overlay,
+            includeAudio: (event.currentTarget as HTMLInputElement).checked,
+          })}
+      />
+      <span>Include sting audio</span>
+    </label>
+    <p class="asset-note">
+      Toasty-right · 3× speed · fixed green key<br />
+      {overlay.asset.width} × {overlay.asset.height} ·
+      {(overlay.asset.durationMs / 1_000).toFixed(2)} seconds ·
+      {overlay.asset.hasAudio ? "audio detected" : "silent"}
+    </p>
   {/if}
 </section>

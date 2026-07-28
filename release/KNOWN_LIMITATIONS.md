@@ -15,7 +15,8 @@ The current package is for internal evaluation, not public distribution.
 - There is no updater, account, cloud storage, telemetry, analytics, upload, AI,
   transcription, or publishing integration.
 - The editor supports one source video, one active export, static raster
-  overlays, and a fixed 1080×1920 H.264/AAC output.
+  overlays, one fixed-preset Skull’d sting, and a fixed 1080×1920 H.264/AAC
+  output. It does not support general video tracks, arbitrary keys or keyframes.
 
 Core editing and export run without network access once the local media tools are
 available.

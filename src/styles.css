@@ -615,6 +615,24 @@ footer {
   user-select: none;
 }
 
+.sting-preview-loader {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sting-preview-sprite {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 .overlay-resize-handle {
   position: absolute;
   right: -6px;

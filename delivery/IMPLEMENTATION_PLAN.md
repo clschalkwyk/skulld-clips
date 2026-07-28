@@ -109,6 +109,21 @@ Exit:
 - checksums recorded;
 - limitations documented.
 
+## Milestone 6 — Constrained Skull’d sting (2h)
+
+Deliver:
+
+- bounded square MP4 import and project-owned copy;
+- fixed green-key preview sprite;
+- fixed 3× right-edge entrance and exit;
+- optional bounded sting audio mix;
+- contract, decoded-frame, audio and no-freeze verification.
+
+Exit:
+
+- one sting can be imported, previewed, saved, reopened and exported;
+- arbitrary video tracks, key settings and FFmpeg inputs remain unavailable.
+
 ## Weekend cut (12–16h)
 
 Include only:

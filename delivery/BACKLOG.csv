@@ -34,3 +34,4 @@ SCF-052,M5,Logs/redaction,0.75,SCF-003,No leakage
 SCF-053,M5,Diagnostic ZIP,0.75,SCF-052,Exclusions pass
 SCF-054,M5,Startup cleanup,0.5,SCF-013,Stale safe
 SCF-055,M5,Windows package smoke,0.75,SCF-050,Installed export
+SCF-056,M6,Constrained Skull'd sting overlay,2.0,"SCF-041,SCF-050",Keyed motion and audio verified

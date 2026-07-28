@@ -5,11 +5,16 @@ import type {
   ImageOverlay,
   NormalizedRect,
   Overlay,
+  StingAssetRef,
+  StingOverlay,
 } from "../../contracts/types";
 
 const OUTPUT_WIDTH = 1080;
 const OUTPUT_HEIGHT = 1920;
 const MIN_OVERLAY_PIXELS = 32;
+export const STING_PLAYBACK_RATE = 3;
+export const STING_ENTRY_MS = 180;
+export const STING_EXIT_MS = 120;
 
 export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   text: "",
@@ -72,8 +77,58 @@ export function createCaptionOverlay(
   };
 }
 
+export function createStingOverlay(
+  id: string,
+  asset: StingAssetRef,
+  inMs: number,
+  outMs: number,
+  zIndex: number,
+): StingOverlay {
+  const durationMs = Math.min(
+    Math.floor(asset.durationMs / STING_PLAYBACK_RATE),
+    outMs - inMs,
+  );
+  if (durationMs < 500) {
+    throw new Error("The active range must leave at least 500 ms for the Skull'd sting.");
+  }
+  const startMs = Math.min(inMs + 2_000, outMs - durationMs);
+  return {
+    id,
+    type: "sting",
+    name: asset.originalFilename ?? "Skull'd sting",
+    asset,
+    preset: "toasty-right",
+    includeAudio: asset.hasAudio,
+    position: stingSafePosition(asset),
+    opacity: 1,
+    startMs,
+    endMs: startMs + durationMs,
+    zIndex,
+  };
+}
+
 export function isOverlayVisible(overlay: Overlay, playheadMs: number): boolean {
   return playheadMs >= overlay.startMs && playheadMs <= overlay.endMs;
+}
+
+export function stingDisplayX(overlay: StingOverlay, playheadMs: number): number {
+  const entryEndMs = overlay.startMs + STING_ENTRY_MS;
+  const exitStartMs = overlay.endMs - STING_EXIT_MS;
+  if (playheadMs < entryEndMs) {
+    return lerp(
+      1,
+      overlay.position.x,
+      clamp((playheadMs - overlay.startMs) / STING_ENTRY_MS, 0, 1),
+    );
+  }
+  if (playheadMs > exitStartMs) {
+    return lerp(
+      overlay.position.x,
+      1,
+      clamp((playheadMs - exitStartMs) / STING_EXIT_MS, 0, 1),
+    );
+  }
+  return overlay.position.x;
 }
 
 export function moveOverlay(
@@ -110,6 +165,10 @@ export function resetOverlayPosition(asset: AssetRef): NormalizedRect {
   return centeredAssetPosition(asset, 0.24);
 }
 
+export function resetStingPosition(asset: StingAssetRef): NormalizedRect {
+  return stingSafePosition(asset);
+}
+
 export function nextZIndex(overlays: Overlay[]): number {
   return overlays.reduce((maximum, overlay) => Math.max(maximum, overlay.zIndex), -1) + 1;
 }
@@ -133,7 +192,7 @@ export function reorderOverlay(
 }
 
 export function overlayAsset(overlay: Overlay): AssetRef {
-  return overlay.type === "image" ? overlay.asset : overlay.generatedAsset;
+  return overlay.type === "caption" ? overlay.generatedAsset : overlay.asset;
 }
 
 export function replaceOverlayAsset(
@@ -146,6 +205,9 @@ export function replaceOverlayAsset(
       asset,
       position: resizeOverlay(overlay.position, asset, overlay.position.width),
     };
+  }
+  if (overlay.type !== "caption") {
+    return overlay;
   }
   const previousIntrinsicWidth = overlay.generatedAsset.width / OUTPUT_WIDTH;
   const scale =
@@ -162,6 +224,21 @@ export function replaceOverlayAsset(
   resized.x = roundSix(clamp(centerX - resized.width / 2, 0, 1 - resized.width));
   resized.y = roundSix(clamp(centerY - resized.height / 2, 0, 1 - resized.height));
   return { ...overlay, generatedAsset: asset, position: resized };
+}
+
+export function replaceStingAsset(
+  overlay: StingOverlay,
+  asset: StingAssetRef,
+): StingOverlay {
+  const maximumDuration = Math.floor(asset.durationMs / STING_PLAYBACK_RATE);
+  const endMs = Math.min(overlay.endMs, overlay.startMs + maximumDuration);
+  return {
+    ...overlay,
+    asset,
+    includeAudio: overlay.includeAudio && asset.hasAudio,
+    endMs,
+    position: resizeOverlay(overlay.position, asset, overlay.position.width),
+  };
 }
 
 function centeredAssetPosition(asset: AssetRef, requestedWidth: number): NormalizedRect {
@@ -182,6 +259,20 @@ function centeredAssetPosition(asset: AssetRef, requestedWidth: number): Normali
   });
 }
 
+function stingSafePosition(asset: StingAssetRef): NormalizedRect {
+  const width = Math.min(440 / OUTPUT_WIDTH, 1);
+  const height = Math.min(
+    1,
+    width * (OUTPUT_WIDTH / OUTPUT_HEIGHT) / (asset.width / asset.height),
+  );
+  return roundRect({
+    x: clamp(1 - width - 24 / OUTPUT_WIDTH, 0, 1 - width),
+    y: clamp(1 - height - 80 / OUTPUT_HEIGHT, 0, 1 - height),
+    width,
+    height,
+  });
+}
+
 function roundRect(rect: NormalizedRect): NormalizedRect {
   return {
     x: roundSix(rect.x),
@@ -197,4 +288,8 @@ function roundSix(value: number): number {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function lerp(start: number, end: number, amount: number): number {
+  return start + (end - start) * amount;
 }

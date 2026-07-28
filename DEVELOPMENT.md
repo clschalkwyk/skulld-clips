@@ -44,11 +44,12 @@ The frontend dev server binds only to `127.0.0.1:1420`.
 
 ## Implemented baseline
 
-Milestones M0–M5 implement:
+Milestones M0–M6 implement:
 
 - the least-privilege Tauri/Svelte/Rust boundary and stable typed contracts;
 - probing, versioned projects, autosave, recents and relink;
-- preview, trim, crop, image overlays and rasterized captions;
+- preview, trim, crop, image overlays, rasterized captions and one constrained
+  `toasty-right` MP4 sting;
 - safe FFmpeg argument/filter construction, progress, process-tree cancellation,
   output verification and atomic publication;
 - rotating redacted logs, explicit diagnostic ZIPs and startup cleanup;

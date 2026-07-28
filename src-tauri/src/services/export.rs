@@ -22,7 +22,7 @@ use crate::{
     },
     ffmpeg::{
         args::build_ffmpeg_args,
-        filter_graph::{ordered_overlays, resolved_frame_rate},
+        filter_graph::{ordered_overlays, output_has_audio, resolved_frame_rate},
         progress::{ProgressParser, ProgressSnapshot},
     },
     services::{assets, media_tools, probe, projects},
@@ -131,7 +131,7 @@ pub fn validate_export(
     let mut warnings = Vec::new();
     let estimated_bytes = Some(estimate_output_bytes(
         request.project_snapshot.timeline.out_ms - request.project_snapshot.timeline.in_ms,
-        request.project_snapshot.source.probe.has_audio,
+        output_has_audio(&request.project_snapshot),
         request.settings.quality_mode,
         request.settings.audio_bitrate_kbps,
     ));
@@ -512,7 +512,8 @@ pub fn verify_output(
         .avg_frame_rate
         .or(output.video.real_frame_rate)
         .is_some_and(|actual| (actual - f64::from(frame_rate)).abs() <= 0.05);
-    let audio_valid = if project.source.probe.has_audio {
+    let expected_audio = output_has_audio(project);
+    let audio_valid = if expected_audio {
         details.audio_streams == 1
             && output
                 .audio
@@ -1003,7 +1004,9 @@ mod tests {
         project.timeline.out_ms = 1_000;
         for item in &mut project.overlays {
             match item {
-                Overlay::Image { base, .. } | Overlay::Caption { base, .. } => {
+                Overlay::Image { base, .. }
+                | Overlay::Caption { base, .. }
+                | Overlay::Sting { base, .. } => {
                     base.start_ms = 0;
                     base.end_ms = 1_000;
                 }

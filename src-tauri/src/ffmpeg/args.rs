@@ -1,8 +1,10 @@
 use std::{ffi::OsString, path::Path};
 
 use crate::{
-    domain::{ExportSettings, ProjectV1, QualityMode},
-    ffmpeg::filter_graph::{build_filter_graph, ordered_overlays, resolved_frame_rate, seconds},
+    domain::{ExportSettings, Overlay, ProjectV1, QualityMode},
+    ffmpeg::filter_graph::{
+        build_filter_graph, ordered_overlays, output_has_audio, resolved_frame_rate, seconds,
+    },
 };
 
 pub fn build_ffmpeg_args(
@@ -28,15 +30,11 @@ pub fn build_ffmpeg_args(
         "-i".into(),
         project.source.path.as_str().into(),
     ];
-    for asset in asset_paths {
-        args.extend([
-            "-loop".into(),
-            "1".into(),
-            "-framerate".into(),
-            "1".into(),
-            "-i".into(),
-            asset.as_ref().as_os_str().to_owned(),
-        ]);
+    for (overlay, asset) in ordered_overlays(project).into_iter().zip(asset_paths) {
+        if !matches!(overlay, Overlay::Sting { .. }) {
+            args.extend(["-loop".into(), "1".into(), "-framerate".into(), "1".into()]);
+        }
+        args.extend(["-i".into(), asset.as_ref().as_os_str().to_owned()]);
     }
     args.extend([
         "-filter_complex".into(),
@@ -44,7 +42,8 @@ pub fn build_ffmpeg_args(
         "-map".into(),
         "[vout]".into(),
     ]);
-    if project.source.probe.has_audio {
+    let has_audio = output_has_audio(project);
+    if has_audio {
         args.extend(["-map".into(), "[aout]".into()]);
     }
     args.extend([
@@ -63,7 +62,7 @@ pub fn build_ffmpeg_args(
         "-pix_fmt".into(),
         "yuv420p".into(),
     ]);
-    if project.source.probe.has_audio {
+    if has_audio {
         args.extend([
             "-c:a".into(),
             "aac".into(),

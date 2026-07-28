@@ -4,9 +4,9 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::{
-    domain::{AppError, AssetRef},
+    domain::{AppError, AssetRef, StingAssetRef},
     security::path_policy::PathPolicy,
-    services::{assets, projects},
+    services::{assets, media_tools, probe, projects},
 };
 
 #[tauri::command]
@@ -26,6 +26,31 @@ pub async fn select_overlay_file(
         Some(path) => {
             let path = path.into_path().map_err(|_| {
                 AppError::invalid_argument("The selected image path is not supported.")
+            })?;
+            let canonical = paths.authorize_existing_file(&path)?;
+            Ok(Some(path_to_string(canonical)?))
+        }
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
+pub async fn select_sting_file(
+    app: AppHandle,
+    paths: State<'_, PathPolicy>,
+) -> Result<Option<String>, AppError> {
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("Skull'd sting", &["mp4"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|_| AppError::internal("The sting file dialog did not complete."))?;
+    match selected {
+        Some(path) => {
+            let path = path.into_path().map_err(|_| {
+                AppError::invalid_argument("The selected sting path is not supported.")
             })?;
             let canonical = paths.authorize_existing_file(&path)?;
             Ok(Some(path_to_string(canonical)?))
@@ -56,6 +81,48 @@ pub async fn import_overlay_asset(
     app.asset_protocol_scope()
         .allow_file(destination)
         .map_err(|_| AppError::internal("The image preview path could not be authorized."))?;
+    Ok(asset)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn import_sting_asset(
+    app: AppHandle,
+    paths: State<'_, PathPolicy>,
+    project_path: String,
+    source_asset_path: String,
+) -> Result<StingAssetRef, AppError> {
+    let project_path = paths.require_existing_file(PathBuf::from(project_path).as_path())?;
+    let source_asset_path =
+        paths.require_existing_file(PathBuf::from(source_asset_path).as_path())?;
+    let validation_path = project_path.clone();
+    tauri::async_runtime::spawn_blocking(move || projects::load_project(&validation_path))
+        .await
+        .map_err(|_| AppError::internal("Project sting validation did not complete."))??;
+    let resource_dir = app.path().resource_dir().ok();
+    let ffmpeg_path = media_tools::resolve_ffmpeg_path(resource_dir.as_deref())?;
+    let probe_path = source_asset_path.clone();
+    let media_probe = tauri::async_runtime::spawn_blocking(move || {
+        probe::probe_media(&probe_path, resource_dir.as_deref())
+    })
+    .await
+    .map_err(|_| AppError::internal("Sting probing did not complete."))??;
+    let (asset, destination, preview_destination) =
+        tauri::async_runtime::spawn_blocking(move || {
+            assets::import_sting_asset(
+                &project_path,
+                &source_asset_path,
+                &media_probe,
+                &ffmpeg_path,
+            )
+        })
+        .await
+        .map_err(|_| AppError::internal("Sting import did not complete."))??;
+    app.asset_protocol_scope()
+        .allow_file(destination)
+        .map_err(|_| AppError::internal("The sting preview path could not be authorized."))?;
+    app.asset_protocol_scope()
+        .allow_file(preview_destination)
+        .map_err(|_| AppError::internal("The sting sprite path could not be authorized."))?;
     Ok(asset)
 }
 

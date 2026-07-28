@@ -50,7 +50,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::assets::select_overlay_file,
+            commands::assets::select_sting_file,
             commands::assets::import_overlay_asset,
+            commands::assets::import_sting_asset,
             commands::assets::write_caption_asset,
             commands::diagnostics::select_diagnostic_destination,
             commands::diagnostics::create_diagnostic_bundle,

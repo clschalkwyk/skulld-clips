@@ -56,6 +56,25 @@ export interface AssetRef {
   originalFilename: string | null;
 }
 
+export interface StingAssetRef extends AssetRef {
+  durationMs: Milliseconds;
+  hasAudio: boolean;
+  preview: StingPreviewRef;
+}
+
+export interface StingPreviewRef {
+  relativePath: string;
+  sha256: string;
+  width: number;
+  height: number;
+  frameWidth: 192;
+  frameHeight: 192;
+  columns: number;
+  rows: number;
+  frameCount: number;
+  framesPerSecond: 12;
+}
+
 export interface OverlayBase {
   id: UUID;
   name: string;
@@ -93,7 +112,14 @@ export interface CaptionOverlay extends OverlayBase {
   generatedAsset: AssetRef;
 }
 
-export type Overlay = ImageOverlay | CaptionOverlay;
+export interface StingOverlay extends OverlayBase {
+  type: "sting";
+  asset: StingAssetRef;
+  preset: "toasty-right";
+  includeAudio: boolean;
+}
+
+export type Overlay = ImageOverlay | CaptionOverlay | StingOverlay;
 
 export interface ExportSettings {
   presetId: "vertical-generic" | "youtube-shorts" | "instagram-reels" | "tiktok";

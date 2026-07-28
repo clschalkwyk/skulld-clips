@@ -19,7 +19,9 @@
 
 ## MVP boundary
 
-Included: one local source video, trim, locked 9:16 crop, static image overlays, rasterized caption overlays, project autosave, one export job, local MP4 output, progress and cancellation.
+Included: one local source video, trim, locked 9:16 crop, static image overlays,
+rasterized caption overlays, one constrained Skull’d sting, project autosave,
+one export job, local MP4 output, progress and cancellation.
 
 Excluded: accounts, cloud, AI, transcription, publishing APIs, multiple video tracks, transitions, keyframes, collaboration, mobile apps and general-purpose frontend shell access.
 
@@ -27,11 +29,12 @@ The project is meant to be useful and finishable. It is not meant to become Adob
 
 ## Implementation status
 
-The repository now contains the runnable M0–M5 implementation:
+The repository now contains the runnable M0–M6 implementation:
 
 - local file import, safe ffprobe normalization, versioned projects, autosave,
   recents and relink;
-- video preview, trim, locked 9:16 crop, image overlays and rasterized captions;
+- video preview, trim, locked 9:16 crop, image overlays, rasterized captions and
+  one fixed-preset green-screen Skull’d sting;
 - one Rust-owned FFmpeg export with structured progress, clean cancellation,
   ffprobe verification and atomic publication;
 - redacted rotating logs, explicit diagnostic ZIP creation and stale app-owned
