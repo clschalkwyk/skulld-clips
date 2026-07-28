@@ -16,6 +16,19 @@ function firstLine(value) {
   return value.split(/\r?\n/, 1)[0];
 }
 
+function npmVersion() {
+  const supplied = process.env.SKCF_RELEASE_NPM_VERSION?.trim();
+  if (supplied) {
+    return supplied;
+  }
+  if (process.platform === "win32") {
+    throw new Error(
+      "SKCF_RELEASE_NPM_VERSION is required when writing a release manifest on Windows",
+    );
+  }
+  return command("npm", ["--version"]);
+}
+
 function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
@@ -64,7 +77,7 @@ const manifest = {
   tools: {
     rustc: firstLine(command("rustc", ["--version"])),
     node: process.version,
-    npm: command("npm", ["--version"]),
+    npm: npmVersion(),
     ffmpeg: firstLine(command("ffmpeg", ["-version"])),
     ffprobe: firstLine(command("ffprobe", ["-version"])),
   },

@@ -128,6 +128,7 @@ jobs:
           Copy-Item src-tauri/target/debug/skulld-clip-forge.exe release-artifacts/
           Copy-Item release/THIRD_PARTY_NOTICES.md release-artifacts/
           Copy-Item release/KNOWN_LIMITATIONS.md release-artifacts/
+          $env:SKCF_RELEASE_NPM_VERSION = npm --version
           node scripts/write-release-manifest.mjs `
             --output release-artifacts/release-manifest.json `
             --artifact src-tauri/target/debug/skulld-clip-forge.exe `
