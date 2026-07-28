@@ -38,3 +38,4 @@ SCF-056,M6,Constrained Skull'd sting overlay,2.0,"SCF-041,SCF-050",Keyed motion 
 SCF-057,M6,Sting placement controls,0.5,SCF-056,"Visible selection, anchors, sliders and pixel nudges"
 SCF-058,M6,Source-fitted preview stage,0.25,SCF-057,"Top-aligned preview without redundant letterbox bands"
 SCF-059,M6,Viewport-contained editor,0.25,SCF-058,"Pinned timeline with independently scrolling workspace panels"
+SCF-060,M6,Canvas dock editor layout,1.0,SCF-059,"Full-width rail, compact overlay dock and relative timing"

@@ -1244,6 +1244,7 @@
             overlay={selectedOverlay}
             timelineInMs={session.project.timeline.inMs}
             timelineOutMs={session.project.timeline.outMs}
+            {playheadMs}
             {captionStatus}
             disabled={overlayBusy || session.sourceStatus !== "ok"}
             onChange={updateOverlay}
@@ -1279,21 +1280,21 @@
           </div>
         {/if}
       </aside>
-    </section>
 
-    <Timeline
-      durationMs={session.project.source.probe.durationMs}
-      inMs={session.project.timeline.inMs}
-      outMs={session.project.timeline.outMs}
-      {playheadMs}
-      {playing}
-      overlays={session.project.overlays}
-      disabled={session.sourceStatus !== "ok"}
-      onInChange={updateTrimIn}
-      onOutChange={updateTrimOut}
-      onPlayheadChange={updatePlayhead}
-      onPlayingChange={updatePlaying}
-    />
+      <Timeline
+        durationMs={session.project.source.probe.durationMs}
+        inMs={session.project.timeline.inMs}
+        outMs={session.project.timeline.outMs}
+        {playheadMs}
+        {playing}
+        overlays={session.project.overlays}
+        disabled={session.sourceStatus !== "ok"}
+        onInChange={updateTrimIn}
+        onOutChange={updateTrimOut}
+        onPlayheadChange={updatePlayhead}
+        onPlayingChange={updatePlaying}
+      />
+    </section>
 
     <footer class="editor-footer">
       <span>Milestone 6 · Skull’d sting workflow</span>

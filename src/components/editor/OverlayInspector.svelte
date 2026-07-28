@@ -13,11 +13,18 @@
     resizeOverlay,
     type OverlayAnchor,
   } from "../../services/overlay-model";
+  import {
+    formatRelativeSeconds,
+    placeOverlayEndAtPlayhead,
+    placeOverlayStartAtPlayhead,
+    relativeOverlayTiming,
+  } from "../../services/overlay-timing";
 
   interface Props {
     overlay: Overlay;
     timelineInMs: number;
     timelineOutMs: number;
+    playheadMs: number;
     captionStatus?: "idle" | "rendering" | "error";
     disabled?: boolean;
     onChange: (overlay: Overlay) => void;
@@ -32,6 +39,7 @@
     overlay,
     timelineInMs,
     timelineOutMs,
+    playheadMs,
     captionStatus = "idle",
     disabled = false,
     onChange,
@@ -43,6 +51,17 @@
   }: Props = $props();
 
   let nudgeStepPx = $state(8);
+  const timing = $derived(
+    relativeOverlayTiming(
+      overlay.startMs,
+      overlay.endMs,
+      timelineInMs,
+      timelineOutMs,
+    ),
+  );
+  const timingBarStyle = $derived(
+    `left:${timing.leftPercent}%;width:${timing.widthPercent}%`,
+  );
 
   const anchors: Array<{
     id: OverlayAnchor;
@@ -145,6 +164,42 @@
     });
   }
 
+  function setStartAtPlayhead(): void {
+    const minimumDurationMs = overlay.type === "sting" ? 500 : 1;
+    const maximumDurationMs =
+      overlay.type === "sting"
+        ? Math.floor(overlay.asset.durationMs / 3)
+        : Number.POSITIVE_INFINITY;
+    const range = placeOverlayStartAtPlayhead(
+      playheadMs,
+      overlay.startMs,
+      overlay.endMs,
+      timelineInMs,
+      timelineOutMs,
+      minimumDurationMs,
+      maximumDurationMs,
+    );
+    onChange({ ...overlay, ...range });
+  }
+
+  function setEndAtPlayhead(): void {
+    const minimumDurationMs = overlay.type === "sting" ? 500 : 1;
+    const maximumDurationMs =
+      overlay.type === "sting"
+        ? Math.floor(overlay.asset.durationMs / 3)
+        : Number.POSITIVE_INFINITY;
+    const range = placeOverlayEndAtPlayhead(
+      playheadMs,
+      overlay.startMs,
+      overlay.endMs,
+      timelineInMs,
+      timelineOutMs,
+      minimumDurationMs,
+      maximumDurationMs,
+    );
+    onChange({ ...overlay, ...range });
+  }
+
   function updateCaption(partial: Partial<CaptionStyle>): void {
     if (overlay.type === "caption") {
       onCaptionChange(overlay.id, { ...overlay.caption, ...partial });
@@ -189,62 +244,19 @@
 <section class="overlay-inspector" aria-labelledby="overlay-heading">
   <div class="inspector-heading">
     <div>
-      <p class="section-label">{overlay.type} overlay</p>
+      <p class="section-label">{overlay.type}</p>
       <h2 id="overlay-heading" title={overlay.name}>{overlay.name}</h2>
     </div>
     <button type="button" disabled={disabled} onclick={() => onDelete(overlay.id)}>
-      Delete
+      Remove
     </button>
   </div>
-
-  <label class="field-control">
-    <span>Name</span>
-    <input
-      type="text"
-      required
-      maxlength="120"
-      value={overlay.name}
-      disabled={disabled}
-      onchange={(event) => {
-        const name = stringValue(event).trim();
-        if (name) {
-          onChange({ ...overlay, name });
-        }
-      }}
-    />
-  </label>
-
-  <div class="order-actions">
-    <button type="button" disabled={disabled} onclick={() => onReorder(overlay.id, -1)}>
-      Send backward
-    </button>
-    <button type="button" disabled={disabled} onclick={() => onReorder(overlay.id, 1)}>
-      Bring forward
-    </button>
-  </div>
-
-  <label class="field-control">
-    <span>Opacity <strong>{Math.round(overlay.opacity * 100)}%</strong></span>
-    <input
-      type="range"
-      min="0"
-      max="1"
-      step="0.01"
-      value={overlay.opacity}
-      disabled={disabled}
-      oninput={(event) =>
-        onChange({
-          ...overlay,
-          opacity: clamp(numberValue(event), 0, 1),
-        })}
-    />
-  </label>
 
   <div class="control-section placement-editor">
     <div class="control-section-heading">
       <div>
         <strong>Placement</strong>
-        <small>Drag on the preview or use precise controls.</small>
+        <small>Drag on the preview or choose a safe anchor.</small>
       </div>
       <button type="button" disabled={disabled} onclick={resetPosition}>
         {overlay.type === "sting" ? "Safe corner" : "Reset"}
@@ -253,8 +265,8 @@
 
     <div class="placement-workbench">
       <div class="placement-tool">
-        <span class="control-label">Anchor</span>
-        <div class="anchor-grid" aria-label="Overlay anchor positions">
+        <span class="control-label">Anchor position</span>
+        <div class="anchor-grid anchor-grid-primary" aria-label="Overlay anchor positions">
           {#each anchors as anchor (anchor.id)}
             <button
               type="button"
@@ -270,10 +282,110 @@
           {/each}
         </div>
       </div>
+    </div>
 
-      <div class="placement-tool">
+    <div class="placement-sliders primary-size-control">
+      <label>
+        <span>
+          Size
+          <strong>{Math.round(overlay.position.width * 1080)} px</strong>
+        </span>
+        <input
+          type="range"
+          min={32 / 1080}
+          max="1"
+          step={1 / 1080}
+          value={overlay.position.width}
+          disabled={disabled}
+          oninput={(event) => updateWidth(numberValue(event))}
+        />
+      </label>
+    </div>
+  </div>
+
+  <div class="control-section timing-editor">
+    <div class="control-section-heading">
+      <div>
+        <strong>Timing</strong>
+        <small>Relative to the selected clip.</small>
+      </div>
+    </div>
+    <div class="relative-timing-summary">
+      <div>
+        <span>Starts</span>
+        <strong>
+          {timing.startOffsetMs <= 0
+            ? "At clip in"
+            : `+${formatRelativeSeconds(timing.startOffsetMs)} after in`}
+        </strong>
+      </div>
+      <div>
+        <span>Duration</span>
+        <strong>{formatRelativeSeconds(timing.durationMs)}</strong>
+      </div>
+    </div>
+    <div class="relative-timing-track" aria-label="Overlay position within selected clip">
+      <span style={timingBarStyle}></span>
+    </div>
+    <div class="playhead-actions">
+      <button type="button" disabled={disabled} onclick={setStartAtPlayhead}>
+        Start at playhead
+      </button>
+      <button type="button" disabled={disabled} onclick={setEndAtPlayhead}>
+        End at playhead
+      </button>
+    </div>
+  </div>
+
+  <details class="advanced-overlay">
+    <summary>Advanced controls</summary>
+    <div class="advanced-overlay-content">
+      <label class="field-control">
+        <span>Name</span>
+        <input
+          type="text"
+          required
+          maxlength="120"
+          value={overlay.name}
+          disabled={disabled}
+          onchange={(event) => {
+            const name = stringValue(event).trim();
+            if (name) {
+              onChange({ ...overlay, name });
+            }
+          }}
+        />
+      </label>
+
+      <label class="field-control">
+        <span>Opacity <strong>{Math.round(overlay.opacity * 100)}%</strong></span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={overlay.opacity}
+          disabled={disabled}
+          oninput={(event) =>
+            onChange({
+              ...overlay,
+              opacity: clamp(numberValue(event), 0, 1),
+            })}
+        />
+      </label>
+
+      <div class="order-actions">
+        <button type="button" disabled={disabled} onclick={() => onReorder(overlay.id, -1)}>
+          Send backward
+        </button>
+        <button type="button" disabled={disabled} onclick={() => onReorder(overlay.id, 1)}>
+          Bring forward
+        </button>
+      </div>
+
+      <div class="advanced-nudge">
         <label class="nudge-step">
-          <span class="control-label">Nudge</span>
+          <span class="control-label">Nudge distance</span>
           <select
             aria-label="Overlay nudge distance"
             value={nudgeStepPx}
@@ -312,136 +424,116 @@
           >↓</button>
         </div>
       </div>
-    </div>
 
-    <div class="placement-sliders">
-      <label>
-        <span>Left <strong>{Math.round(overlay.position.x * 100)}%</strong></span>
-        <input
-          type="range"
-          min="0"
-          max={1 - overlay.position.width}
-          step={1 / 1080}
-          value={overlay.position.x}
-          disabled={disabled}
-          oninput={(event) => updatePosition({ x: numberValue(event) })}
-        />
-      </label>
-      <label>
-        <span>Top <strong>{Math.round(overlay.position.y * 100)}%</strong></span>
-        <input
-          type="range"
-          min="0"
-          max={1 - overlay.position.height}
-          step={1 / 1920}
-          value={overlay.position.y}
-          disabled={disabled}
-          oninput={(event) => updatePosition({ y: numberValue(event) })}
-        />
-      </label>
-      <label>
-        <span>
-          Size
-          <strong>{Math.round(overlay.position.width * 1080)} px</strong>
-        </span>
-        <input
-          type="range"
-          min={32 / 1080}
-          max="1"
-          step={1 / 1080}
-          value={overlay.position.width}
-          disabled={disabled}
-          oninput={(event) => updateWidth(numberValue(event))}
-        />
-      </label>
-    </div>
-
-    <details class="exact-placement">
-      <summary>Exact values</summary>
-      <div class="position-inputs overlay-position-inputs">
+      <div class="placement-sliders">
         <label>
-          <span>X</span>
+          <span>Left <strong>{Math.round(overlay.position.x * 100)}%</strong></span>
           <input
-            type="number"
+            type="range"
             min="0"
             max={1 - overlay.position.width}
-            step="0.000001"
+            step={1 / 1080}
             value={overlay.position.x}
             disabled={disabled}
             oninput={(event) => updatePosition({ x: numberValue(event) })}
           />
         </label>
         <label>
-          <span>Y</span>
+          <span>Top <strong>{Math.round(overlay.position.y * 100)}%</strong></span>
           <input
-            type="number"
+            type="range"
             min="0"
             max={1 - overlay.position.height}
-            step="0.000001"
+            step={1 / 1920}
             value={overlay.position.y}
             disabled={disabled}
             oninput={(event) => updatePosition({ y: numberValue(event) })}
           />
         </label>
-        <label>
-          <span>Width</span>
-          <input
-            type="number"
-            min={32 / 1080}
-            max="1"
-            step="0.000001"
-            value={overlay.position.width}
-            disabled={disabled}
-            oninput={(event) => updateWidth(numberValue(event))}
-          />
-        </label>
-        <label>
-          <span>Height</span>
-          <input type="number" value={overlay.position.height} disabled readonly />
-        </label>
       </div>
-    </details>
-  </div>
 
-  <div class="control-section timing-editor">
-    <div class="control-section-heading">
-      <div>
-        <strong>Timing</strong>
-        <small>Milliseconds within the source video.</small>
-      </div>
+      <details class="exact-placement">
+        <summary>Exact placement</summary>
+        <div class="position-inputs overlay-position-inputs">
+          <label>
+            <span>X</span>
+            <input
+              type="number"
+              min="0"
+              max={1 - overlay.position.width}
+              step="0.000001"
+              value={overlay.position.x}
+              disabled={disabled}
+              oninput={(event) => updatePosition({ x: numberValue(event) })}
+            />
+          </label>
+          <label>
+            <span>Y</span>
+            <input
+              type="number"
+              min="0"
+              max={1 - overlay.position.height}
+              step="0.000001"
+              value={overlay.position.y}
+              disabled={disabled}
+              oninput={(event) => updatePosition({ y: numberValue(event) })}
+            />
+          </label>
+          <label>
+            <span>Width</span>
+            <input
+              type="number"
+              min={32 / 1080}
+              max="1"
+              step="0.000001"
+              value={overlay.position.width}
+              disabled={disabled}
+              oninput={(event) => updateWidth(numberValue(event))}
+            />
+          </label>
+          <label>
+            <span>Height</span>
+            <input type="number" value={overlay.position.height} disabled readonly />
+          </label>
+        </div>
+      </details>
+
+      <details class="exact-placement">
+        <summary>Exact timing</summary>
+        <div class="timing-inputs">
+          <label>
+            <span>Start ms</span>
+            <input
+              type="number"
+              min={timelineInMs}
+              max={overlay.endMs - (overlay.type === "sting" ? 500 : 1)}
+              step="1"
+              value={overlay.startMs}
+              disabled={disabled}
+              oninput={(event) => updateStart(numberValue(event))}
+            />
+          </label>
+          <label>
+            <span>End ms</span>
+            <input
+              type="number"
+              min={overlay.startMs + (overlay.type === "sting" ? 500 : 1)}
+              max={overlay.type === "sting"
+                ? Math.min(
+                    timelineOutMs,
+                    overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
+                  )
+                : timelineOutMs}
+              step="1"
+              value={overlay.endMs}
+              disabled={disabled}
+              oninput={(event) => updateEnd(numberValue(event))}
+            />
+          </label>
+        </div>
+      </details>
     </div>
-    <div class="timing-inputs">
-      <label>
-        <span>Start</span>
-        <input
-          type="number"
-          min={timelineInMs}
-          max={overlay.endMs - (overlay.type === "sting" ? 500 : 1)}
-          step="1"
-          value={overlay.startMs}
-          disabled={disabled}
-          oninput={(event) => updateStart(numberValue(event))}
-        />
-      </label>
-      <label>
-        <span>End</span>
-        <input
-          type="number"
-          min={overlay.startMs + (overlay.type === "sting" ? 500 : 1)}
-          max={overlay.type === "sting"
-            ? Math.min(
-                timelineOutMs,
-                overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
-              )
-            : timelineOutMs}
-          step="1"
-          value={overlay.endMs}
-          disabled={disabled}
-          oninput={(event) => updateEnd(numberValue(event))}
-        />
-      </label>
-    </div>
-  </div>
+  </details>
 
   {#if overlay.type === "image"}
     <div class="asset-actions">

@@ -41,9 +41,20 @@ Feature: Build a branded vertical gameplay clip
   Scenario: Preview uses the available editor space efficiently
     Given I opened a project with a verified source
     When the editor inspector is taller than the source preview
-    Then the preview stays at the top of its column
-    And the stage matches the display-oriented source aspect ratio
+    Then the stage matches the display-oriented source aspect ratio
+    And the stage fits inside the available canvas row
     And the inspector scrolls without pushing the timeline below the window
+
+  Scenario: Canvas dock keeps overlay work close to the preview
+    Given I opened a project with a sting inside the active range
+    When I select the sting in the compact layer rail
+    Then the preview uses the dominant editor width
+    And the timeline starts after the layer rail below the preview and dock
+    And the dock shows nine placement anchors and a size control
+    And the dock shows the sting start offset and duration relative to clip in
+    When I set the sting start and end from the playhead
+    Then its integer millisecond timing remains within the active range
+    And exact placement and timing values remain available under advanced controls
 
   Scenario: Cancel
     Given a valid export is running

@@ -65,23 +65,22 @@ Recent project card:
 ```text
 ┌────────────────────────────────────────────────────────────────────┐
 │ Back | Project name | Saved/Saving/Error | Export                  │
-├──────────────────────┬─────────────────────────────┬───────────────┤
-│ Layers/assets        │ Preview stage               │ Inspector     │
-│                      │ 9:16 crop + overlays        │ Trim          │
-│                      │                             │ Crop          │
-│                      │                             │ Caption/Image │
-│                      │                             │ Skull’d sting │
-├──────────────────────┴─────────────────────────────┴───────────────┤
-│ Transport | range | playhead | overlay visibility bars             │
-└────────────────────────────────────────────────────────────────────┘
+├────────┬───────────────────────────────────────────┬───────────────┤
+│ Layer  │ Preview stage                             │ Compact dock  │
+│ rail   │ 9:16 crop + overlays                      │ Crop/overlay  │
+│        │                                           │ controls      │
+│        ├───────────────────────────────────────────┴───────────────┤
+│        │ Transport | trim | playhead | overlay visibility bars     │
+└────────┴───────────────────────────────────────────────────────────┘
 ```
 
 Minimum practical window: 1100×700. Below that, collapse the inspector to a drawer.
 
-At or above the minimum window, the editor is contained within the application
-viewport. The header, timeline and footer remain visible while the layers,
-preview and inspector columns scroll independently when their content exceeds
-the available workspace height.
+At or above the minimum window, the editor uses the full available application
+width and is contained within the viewport. The layer rail remains narrow, the
+preview receives the dominant workspace, and the timeline begins after the rail
+below the preview and dock. The preview and inspector handle their own overflow;
+the editor page does not become a long scrolling document.
 
 ### Export sheet
 
@@ -114,10 +113,10 @@ Active export:
 
 ## Preview/crop interaction
 
-The preview stage uses the display-oriented source aspect ratio and stays
-top-aligned in the editor so a taller inspector does not add empty bands above
-and below the video. The video is letterboxed only when the stage and decoded
-frame ratios differ. The crop frame represents output.
+The preview stage uses the display-oriented source aspect ratio and fits within
+the available canvas row without forcing document-level scrolling. The video is
+letterboxed only when the stage and decoded frame ratios differ. The crop frame
+represents output.
 
 Interactions:
 
@@ -146,6 +145,11 @@ Storage: integer milliseconds.
 Display: `mm:ss.mmm`.  
 Variable-frame-rate source editing remains time-based.
 
+The selected overlay dock presents timing relative to the active clip: offset
+after the in point and visible duration. Start/end-at-playhead actions are
+primary; exact source-relative millisecond values remain available under
+advanced controls.
+
 ## Overlay editing
 
 Common properties:
@@ -172,9 +176,12 @@ Skull’d sting properties:
 - include verified clip audio;
 - reset to the bottom-right safe placement;
 - choose one of nine safe-area anchors;
+- adjust size as the primary numeric placement control;
+- set the start or end from the current playhead;
+- see start offset and duration relative to the active clip;
 - nudge by 1, 8, or 24 output pixels;
-- adjust left, top, and size with labelled sliders;
-- reveal exact normalized values only on demand.
+- adjust left and top under advanced controls;
+- reveal exact normalized placement and timing values only on demand.
 
 Only one sting is supported. Rust generates a bounded transparent PNG sprite
 with the fixed green-screen key for local preview; export remains authoritative

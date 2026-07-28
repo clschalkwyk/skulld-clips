@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Overlay } from "../../../contracts/types";
-  import { formatTimelineTime } from "../../services/timeline";
 
   interface Props {
     overlays: Overlay[];
@@ -47,37 +46,80 @@
   }
 </script>
 
-<div class="layer-heading">
-  <div>
-    <p class="section-label">Project</p>
-    <h2>Layers</h2>
-  </div>
-  <span>{overlays.length}/100</span>
+<div class="rail-heading">
+  <span>Layers</span>
+  <strong>{overlays.length}</strong>
 </div>
 
-<div class="layer-source">
-  <span class="layer-type">source</span>
-  <strong>Source video</strong>
-  <small>{sourceFilename}</small>
-</div>
+<button
+  type="button"
+  class="rail-item rail-source"
+  class:selected={selectedOverlayId === null}
+  aria-label={`Edit source crop for ${sourceFilename}`}
+  aria-pressed={selectedOverlayId === null}
+  title={sourceFilename}
+  onclick={() => onSelect(null)}
+>
+  <span class="rail-glyph">VID</span>
+  <strong>Source</strong>
+</button>
 
 <div class="layer-actions">
-  <button type="button" disabled={busy} onclick={onAddImage}>Add image</button>
-  <button type="button" disabled={busy || hasSting} onclick={onAddSting}>
-    {hasSting ? "Sting added" : "Add Skull’d sting"}
+  <button
+    type="button"
+    class="rail-item"
+    disabled={busy}
+    aria-label="Add image overlay"
+    title="Add image overlay"
+    onclick={onAddImage}
+  >
+    <span class="rail-glyph">IMG</span>
+    <strong>Image</strong>
   </button>
   <button
     type="button"
+    class="rail-item"
+    disabled={busy || hasSting}
+    aria-label={hasSting ? "Skull’d sting already added" : "Add Skull’d sting"}
+    title={hasSting ? "Skull’d sting already added" : "Add Skull’d sting"}
+    onclick={onAddSting}
+  >
+    <span class="rail-glyph">STG</span>
+    <strong>Sting</strong>
+  </button>
+  <button
+    type="button"
+    class="rail-item"
     disabled={busy}
     aria-expanded={composingCaption}
+    aria-label="Add caption overlay"
+    title="Add caption overlay"
     onclick={() => (composingCaption = !composingCaption)}
   >
-    Add caption
+    <span class="rail-glyph">TXT</span>
+    <strong>Caption</strong>
   </button>
 </div>
 
 {#if composingCaption}
-  <div class="caption-composer">
+  <div class="caption-composer" role="dialog" aria-label="Add caption">
+    <div class="caption-composer-heading">
+      <div>
+        <p class="section-label">Caption</p>
+        <strong>Add text overlay</strong>
+      </div>
+      <button
+        type="button"
+        aria-label="Close caption composer"
+        disabled={addingCaption}
+        onclick={() => {
+          composingCaption = false;
+          captionText = "";
+        }}
+      >
+        Close
+      </button>
+    </div>
     <label>
       <span>Caption text</span>
       <textarea
@@ -95,39 +137,26 @@
       >
         {addingCaption ? "Rendering…" : "Add to clip"}
       </button>
-      <button
-        type="button"
-        disabled={addingCaption}
-        onclick={() => {
-          composingCaption = false;
-          captionText = "";
-        }}
-      >
-        Cancel
-      </button>
     </div>
   </div>
 {/if}
 
-{#if overlays.length === 0}
-  <div class="empty-panel">
-    <strong>No overlays</strong>
-    <span>Add a caption, static brand image, or the Skull’d sting when the framing is ready.</span>
-  </div>
-{:else}
+{#if overlays.length > 0}
   <div class="layer-list" aria-label="Project overlays">
     {#each orderedOverlays as overlay (overlay.id)}
       <button
         type="button"
+        class="rail-item"
         class:selected={selectedOverlayId === overlay.id}
+        aria-label={`Edit ${overlay.type} overlay ${overlay.name}`}
         aria-pressed={selectedOverlayId === overlay.id}
+        title={overlay.name}
         onclick={() => onSelect(overlay.id)}
       >
-        <span class="layer-type">{overlay.type}</span>
-        <strong>{overlay.name}</strong>
-        <small>
-          {formatTimelineTime(overlay.startMs)}–{formatTimelineTime(overlay.endMs)}
-        </small>
+        <span class="rail-glyph">
+          {overlay.type === "sting" ? "STG" : overlay.type === "image" ? "IMG" : "TXT"}
+        </span>
+        <strong>{overlay.type}</strong>
       </button>
     {/each}
   </div>
