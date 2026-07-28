@@ -23,6 +23,8 @@ pub fn build_ffmpeg_args(
         "error".into(),
         "-nostdin".into(),
         "-noautorotate".into(),
+        "-display_rotation".into(),
+        "0".into(),
         "-i".into(),
         project.source.path.as_str().into(),
     ];
@@ -118,6 +120,9 @@ mod tests {
         assert!(args.contains(&paths[1].as_os_str().to_owned()));
         assert_eq!(args.last(), Some(&output.as_os_str().to_owned()));
         assert!(args.contains(&OsString::from("-n")));
+        assert!(args
+            .windows(2)
+            .any(|pair| pair == [OsString::from("-display_rotation"), OsString::from("0")]));
     }
 
     use std::ffi::OsString;
