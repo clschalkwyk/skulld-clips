@@ -78,6 +78,11 @@ Recent project card:
 
 Minimum practical window: 1100×700. Below that, collapse the inspector to a drawer.
 
+At or above the minimum window, the editor is contained within the application
+viewport. The header, timeline and footer remain visible while the layers,
+preview and inspector columns scroll independently when their content exceeds
+the available workspace height.
+
 ### Export sheet
 
 Default:

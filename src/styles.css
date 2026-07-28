@@ -390,9 +390,21 @@ footer {
 }
 
 .editor-shell {
-  display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
+  overflow: hidden;
+}
+
+.editor-bar,
+.source-alert,
+.inline-error,
+.timeline-panel,
+.editor-footer {
+  flex: 0 0 auto;
 }
 
 .editor-bar {
@@ -444,9 +456,11 @@ footer {
 }
 
 .editor-grid {
-  min-height: 570px;
+  min-height: 0;
+  flex: 1 1 0;
   display: grid;
   grid-template-columns: 250px minmax(430px, 1fr) 310px;
+  overflow: hidden;
   border: 1px solid #2b2a2e;
   background: #111013;
 }
@@ -485,9 +499,11 @@ footer {
 
 .preview-panel {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto auto;
   align-content: start;
+  overflow: auto;
 }
 
 .preview-stage {

@@ -43,6 +43,7 @@ Feature: Build a branded vertical gameplay clip
     When the editor inspector is taller than the source preview
     Then the preview stays at the top of its column
     And the stage matches the display-oriented source aspect ratio
+    And the inspector scrolls without pushing the timeline below the window
 
   Scenario: Cancel
     Given a valid export is running
