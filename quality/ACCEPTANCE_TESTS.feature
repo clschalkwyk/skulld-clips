@@ -38,6 +38,12 @@ Feature: Build a branded vertical gameplay clip
     And its audio is mixed without clipping
     And no frozen sting frame remains after its end time
 
+  Scenario: Preview uses the available editor space efficiently
+    Given I opened a project with a verified source
+    When the editor inspector is taller than the source preview
+    Then the preview stays at the top of its column
+    And the stage matches the display-oriented source aspect ratio
+
   Scenario: Cancel
     Given a valid export is running
     When I cancel it

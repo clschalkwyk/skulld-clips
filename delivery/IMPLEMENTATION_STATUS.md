@@ -10,7 +10,7 @@
 | M3 | SCF-030–034 | hashed project-owned image assets, overlay transform/timing/z-order and content-addressed raster captions |
 | M4 | SCF-040–046 | validation, pure graph/args, one process registry, progress, process-tree cancellation, partial verification and atomic publication |
 | M5 | SCF-050–055 | generated fixture/golden suite, redacted logs, diagnostic ZIP exclusions, stale cleanup and installed Windows export/package smoke |
-| M6 | SCF-056–057 | bounded project-owned MP4 sting, fixed Rust-owned green key/3× right-edge motion/audio mix, transparent sprite preview, visible selection, safe-area anchors, pixel nudging, labelled placement sliders and decoded-frame/audio integration |
+| M6 | SCF-056–058 | bounded project-owned MP4 sting, fixed Rust-owned green key/3× right-edge motion/audio mix, transparent sprite preview, visible selection, safe-area anchors, pixel nudging, labelled placement sliders, source-fitted top-aligned preview and decoded-frame/audio integration |
 
 ## Local gates
 

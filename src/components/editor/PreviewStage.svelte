@@ -327,7 +327,11 @@
   }
 </script>
 
-<div class="preview-stage" bind:this={stageElement}>
+<div
+  class="preview-stage"
+  bind:this={stageElement}
+  style={`aspect-ratio:${sourceSize.width} / ${sourceSize.height}`}
+>
   {#if sourceStatus === "ok" && sourceUrl}
     <!-- svelte-ignore a11y_media_has_caption -->
     <video

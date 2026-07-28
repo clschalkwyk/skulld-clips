@@ -486,11 +486,13 @@ footer {
 .preview-panel {
   min-width: 0;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto auto;
+  align-content: start;
 }
 
 .preview-stage {
   position: relative;
+  width: 100%;
   min-height: 0;
   overflow: hidden;
   background:

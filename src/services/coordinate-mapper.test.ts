@@ -8,6 +8,20 @@ import {
 } from "./coordinate-mapper";
 
 describe("coordinate mapper", () => {
+  it("fills a stage that matches the display-oriented source aspect ratio", () => {
+    expect(
+      fitSourceInsideStage(
+        { width: 1920, height: 1080 },
+        { width: 640, height: 360 },
+      ),
+    ).toEqual({
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 360,
+    });
+  });
+
   it("letterboxes a landscape source and maps a normalized crop into the stage", () => {
     const source = { width: 1920, height: 1080 };
     const stage = { width: 500, height: 500 };

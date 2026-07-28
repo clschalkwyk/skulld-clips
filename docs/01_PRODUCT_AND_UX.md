@@ -109,7 +109,10 @@ Active export:
 
 ## Preview/crop interaction
 
-The video is letterboxed inside the stage. The crop frame represents output.
+The preview stage uses the display-oriented source aspect ratio and stays
+top-aligned in the editor so a taller inspector does not add empty bands above
+and below the video. The video is letterboxed only when the stage and decoded
+frame ratios differ. The crop frame represents output.
 
 Interactions:
 
