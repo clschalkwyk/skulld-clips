@@ -30,6 +30,8 @@ Feature: Build a branded vertical gameplay clip
   Scenario: Constrained Skull'd sting
     Given I import a valid green-screen MP4 sting
     And I place it inside the active range
+    And selecting it reveals a settled visible frame
+    And I can anchor, nudge, resize, or drag it within the output bounds
     When I export using the Toasty-right preset with sting audio enabled
     Then the sting enters from the right at 3 times source speed
     And its green background is keyed out

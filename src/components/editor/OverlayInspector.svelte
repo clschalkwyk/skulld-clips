@@ -5,10 +5,13 @@
     Overlay,
   } from "../../../contracts/types";
   import {
+    anchorOverlay,
+    nudgeOverlay,
     overlayAsset,
     resetOverlayPosition,
     resetStingPosition,
     resizeOverlay,
+    type OverlayAnchor,
   } from "../../services/overlay-model";
 
   interface Props {
@@ -39,6 +42,24 @@
     onDelete,
   }: Props = $props();
 
+  let nudgeStepPx = $state(8);
+
+  const anchors: Array<{
+    id: OverlayAnchor;
+    label: string;
+    glyph: string;
+  }> = [
+    { id: "top-left", label: "Top left", glyph: "↖" },
+    { id: "top-center", label: "Top center", glyph: "↑" },
+    { id: "top-right", label: "Top right", glyph: "↗" },
+    { id: "middle-left", label: "Middle left", glyph: "←" },
+    { id: "center", label: "Center", glyph: "•" },
+    { id: "middle-right", label: "Middle right", glyph: "→" },
+    { id: "bottom-left", label: "Bottom left", glyph: "↙" },
+    { id: "bottom-center", label: "Bottom center", glyph: "↓" },
+    { id: "bottom-right", label: "Bottom right", glyph: "↘" },
+  ];
+
   function numberValue(event: Event): number {
     return Number((event.currentTarget as HTMLInputElement).value);
   }
@@ -59,6 +80,42 @@
       ...overlay,
       position: resizeOverlay(overlay.position, overlayAsset(overlay), width),
     });
+  }
+
+  function applyAnchor(anchor: OverlayAnchor): void {
+    onChange({
+      ...overlay,
+      position: anchorOverlay(overlay.position, anchor),
+    });
+  }
+
+  function nudge(deltaX: number, deltaY: number): void {
+    onChange({
+      ...overlay,
+      position: nudgeOverlay(
+        overlay.position,
+        deltaX * nudgeStepPx,
+        deltaY * nudgeStepPx,
+      ),
+    });
+  }
+
+  function resetPosition(): void {
+    onChange({
+      ...overlay,
+      position:
+        overlay.type === "sting"
+          ? resetStingPosition(overlay.asset)
+          : resetOverlayPosition(overlayAsset(overlay)),
+    });
+  }
+
+  function isAtAnchor(anchor: OverlayAnchor): boolean {
+    const anchored = anchorOverlay(overlay.position, anchor);
+    return (
+      Math.abs(anchored.x - overlay.position.x) < 0.000001 &&
+      Math.abs(anchored.y - overlay.position.y) < 0.000001
+    );
   }
 
   function updateStart(value: number): void {
@@ -133,7 +190,7 @@
   <div class="inspector-heading">
     <div>
       <p class="section-label">{overlay.type} overlay</p>
-      <h2 id="overlay-heading">{overlay.name}</h2>
+      <h2 id="overlay-heading" title={overlay.name}>{overlay.name}</h2>
     </div>
     <button type="button" disabled={disabled} onclick={() => onDelete(overlay.id)}>
       Delete
@@ -183,96 +240,213 @@
     />
   </label>
 
-  <div class="position-inputs overlay-position-inputs">
-    <label>
-      <span>X</span>
-      <input
-        type="number"
-        min="0"
-        max={1 - overlay.position.width}
-        step="0.000001"
-        value={overlay.position.x}
-        disabled={disabled}
-        oninput={(event) => updatePosition({ x: numberValue(event) })}
-      />
-    </label>
-    <label>
-      <span>Y</span>
-      <input
-        type="number"
-        min="0"
-        max={1 - overlay.position.height}
-        step="0.000001"
-        value={overlay.position.y}
-        disabled={disabled}
-        oninput={(event) => updatePosition({ y: numberValue(event) })}
-      />
-    </label>
-    <label>
-      <span>Width</span>
-      <input
-        type="number"
-        min={32 / 1080}
-        max="1"
-        step="0.000001"
-        value={overlay.position.width}
-        disabled={disabled}
-        oninput={(event) => updateWidth(numberValue(event))}
-      />
-    </label>
-    <label>
-      <span>Height</span>
-      <input type="number" value={overlay.position.height} disabled readonly />
-    </label>
+  <div class="control-section placement-editor">
+    <div class="control-section-heading">
+      <div>
+        <strong>Placement</strong>
+        <small>Drag on the preview or use precise controls.</small>
+      </div>
+      <button type="button" disabled={disabled} onclick={resetPosition}>
+        {overlay.type === "sting" ? "Safe corner" : "Reset"}
+      </button>
+    </div>
+
+    <div class="placement-workbench">
+      <div class="placement-tool">
+        <span class="control-label">Anchor</span>
+        <div class="anchor-grid" aria-label="Overlay anchor positions">
+          {#each anchors as anchor (anchor.id)}
+            <button
+              type="button"
+              class:active={isAtAnchor(anchor.id)}
+              aria-label={`Place overlay ${anchor.label.toLowerCase()}`}
+              aria-pressed={isAtAnchor(anchor.id)}
+              disabled={disabled}
+              title={anchor.label}
+              onclick={() => applyAnchor(anchor.id)}
+            >
+              {anchor.glyph}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="placement-tool">
+        <label class="nudge-step">
+          <span class="control-label">Nudge</span>
+          <select
+            aria-label="Overlay nudge distance"
+            value={nudgeStepPx}
+            disabled={disabled}
+            onchange={(event) => (nudgeStepPx = numberValue(event))}
+          >
+            <option value={1}>1 px</option>
+            <option value={8}>8 px</option>
+            <option value={24}>24 px</option>
+          </select>
+        </label>
+        <div class="nudge-grid overlay-nudge-grid" aria-label="Overlay nudge controls">
+          <button
+            type="button"
+            aria-label={`Nudge overlay up ${nudgeStepPx} pixels`}
+            disabled={disabled}
+            onclick={() => nudge(0, -1)}
+          >↑</button>
+          <button
+            type="button"
+            aria-label={`Nudge overlay left ${nudgeStepPx} pixels`}
+            disabled={disabled}
+            onclick={() => nudge(-1, 0)}
+          >←</button>
+          <button
+            type="button"
+            aria-label={`Nudge overlay right ${nudgeStepPx} pixels`}
+            disabled={disabled}
+            onclick={() => nudge(1, 0)}
+          >→</button>
+          <button
+            type="button"
+            aria-label={`Nudge overlay down ${nudgeStepPx} pixels`}
+            disabled={disabled}
+            onclick={() => nudge(0, 1)}
+          >↓</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="placement-sliders">
+      <label>
+        <span>Left <strong>{Math.round(overlay.position.x * 100)}%</strong></span>
+        <input
+          type="range"
+          min="0"
+          max={1 - overlay.position.width}
+          step={1 / 1080}
+          value={overlay.position.x}
+          disabled={disabled}
+          oninput={(event) => updatePosition({ x: numberValue(event) })}
+        />
+      </label>
+      <label>
+        <span>Top <strong>{Math.round(overlay.position.y * 100)}%</strong></span>
+        <input
+          type="range"
+          min="0"
+          max={1 - overlay.position.height}
+          step={1 / 1920}
+          value={overlay.position.y}
+          disabled={disabled}
+          oninput={(event) => updatePosition({ y: numberValue(event) })}
+        />
+      </label>
+      <label>
+        <span>
+          Size
+          <strong>{Math.round(overlay.position.width * 1080)} px</strong>
+        </span>
+        <input
+          type="range"
+          min={32 / 1080}
+          max="1"
+          step={1 / 1080}
+          value={overlay.position.width}
+          disabled={disabled}
+          oninput={(event) => updateWidth(numberValue(event))}
+        />
+      </label>
+    </div>
+
+    <details class="exact-placement">
+      <summary>Exact values</summary>
+      <div class="position-inputs overlay-position-inputs">
+        <label>
+          <span>X</span>
+          <input
+            type="number"
+            min="0"
+            max={1 - overlay.position.width}
+            step="0.000001"
+            value={overlay.position.x}
+            disabled={disabled}
+            oninput={(event) => updatePosition({ x: numberValue(event) })}
+          />
+        </label>
+        <label>
+          <span>Y</span>
+          <input
+            type="number"
+            min="0"
+            max={1 - overlay.position.height}
+            step="0.000001"
+            value={overlay.position.y}
+            disabled={disabled}
+            oninput={(event) => updatePosition({ y: numberValue(event) })}
+          />
+        </label>
+        <label>
+          <span>Width</span>
+          <input
+            type="number"
+            min={32 / 1080}
+            max="1"
+            step="0.000001"
+            value={overlay.position.width}
+            disabled={disabled}
+            oninput={(event) => updateWidth(numberValue(event))}
+          />
+        </label>
+        <label>
+          <span>Height</span>
+          <input type="number" value={overlay.position.height} disabled readonly />
+        </label>
+      </div>
+    </details>
   </div>
 
-  <div class="timing-inputs">
-    <label>
-      <span>Start ms</span>
-      <input
-        type="number"
-        min={timelineInMs}
-        max={overlay.endMs - (overlay.type === "sting" ? 500 : 1)}
-        step="1"
-        value={overlay.startMs}
-        disabled={disabled}
-        oninput={(event) => updateStart(numberValue(event))}
-      />
-    </label>
-    <label>
-      <span>End ms</span>
-      <input
-        type="number"
-        min={overlay.startMs + (overlay.type === "sting" ? 500 : 1)}
-        max={overlay.type === "sting"
-          ? Math.min(
-              timelineOutMs,
-              overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
-            )
-          : timelineOutMs}
-        step="1"
-        value={overlay.endMs}
-        disabled={disabled}
-        oninput={(event) => updateEnd(numberValue(event))}
-      />
-    </label>
+  <div class="control-section timing-editor">
+    <div class="control-section-heading">
+      <div>
+        <strong>Timing</strong>
+        <small>Milliseconds within the source video.</small>
+      </div>
+    </div>
+    <div class="timing-inputs">
+      <label>
+        <span>Start</span>
+        <input
+          type="number"
+          min={timelineInMs}
+          max={overlay.endMs - (overlay.type === "sting" ? 500 : 1)}
+          step="1"
+          value={overlay.startMs}
+          disabled={disabled}
+          oninput={(event) => updateStart(numberValue(event))}
+        />
+      </label>
+      <label>
+        <span>End</span>
+        <input
+          type="number"
+          min={overlay.startMs + (overlay.type === "sting" ? 500 : 1)}
+          max={overlay.type === "sting"
+            ? Math.min(
+                timelineOutMs,
+                overlay.startMs + Math.floor(overlay.asset.durationMs / 3),
+              )
+            : timelineOutMs}
+          step="1"
+          value={overlay.endMs}
+          disabled={disabled}
+          oninput={(event) => updateEnd(numberValue(event))}
+        />
+      </label>
+    </div>
   </div>
 
   {#if overlay.type === "image"}
     <div class="asset-actions">
       <button type="button" disabled={disabled} onclick={() => onReplaceImage(overlay.id)}>
         Replace image
-      </button>
-      <button
-        type="button"
-        disabled={disabled}
-        onclick={() =>
-          onChange({
-            ...overlay,
-            position: resetOverlayPosition(overlay.asset),
-          })}
-      >
-        Reset position
       </button>
     </div>
     <p class="asset-note">
@@ -455,17 +629,6 @@
     <div class="asset-actions">
       <button type="button" disabled={disabled} onclick={() => onReplaceSting(overlay.id)}>
         Replace sting MP4
-      </button>
-      <button
-        type="button"
-        disabled={disabled}
-        onclick={() =>
-          onChange({
-            ...overlay,
-            position: resetStingPosition(overlay.asset),
-          })}
-      >
-        Reset safe placement
       </button>
     </div>
     <label class="checkbox-control">

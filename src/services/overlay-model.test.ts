@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { AssetRef, Overlay, StingAssetRef } from "../../contracts/types";
 import {
+  anchorOverlay,
   createImageOverlay,
   createStingOverlay,
   isOverlayVisible,
   moveOverlay,
+  nudgeOverlay,
   reorderOverlay,
   resizeOverlay,
   stingDisplayX,
@@ -81,6 +83,36 @@ describe("overlay model", () => {
       y: 0.46625,
       width: 0.5,
       height: 0.140625,
+    });
+  });
+
+  it("anchors overlays inside the output safe area and nudges in output pixels", () => {
+    const position = {
+      x: 0.38,
+      y: 0.46625,
+      width: 0.24,
+      height: 0.0675,
+    };
+
+    expect(anchorOverlay(position, "top-left")).toEqual({
+      ...position,
+      x: 0.022222,
+      y: 0.041667,
+    });
+    expect(anchorOverlay(position, "center")).toEqual({
+      ...position,
+      x: 0.38,
+      y: 0.46625,
+    });
+    expect(anchorOverlay(position, "bottom-right")).toEqual({
+      ...position,
+      x: 0.737778,
+      y: 0.890833,
+    });
+    expect(nudgeOverlay(position, 10, -10)).toEqual({
+      ...position,
+      x: 0.389259,
+      y: 0.461042,
     });
   });
 

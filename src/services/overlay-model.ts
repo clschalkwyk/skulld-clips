@@ -15,6 +15,19 @@ const MIN_OVERLAY_PIXELS = 32;
 export const STING_PLAYBACK_RATE = 3;
 export const STING_ENTRY_MS = 180;
 export const STING_EXIT_MS = 120;
+const OUTPUT_SAFE_X_PX = 24;
+const OUTPUT_SAFE_Y_PX = 80;
+
+export type OverlayAnchor =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "middle-left"
+  | "center"
+  | "middle-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   text: "",
@@ -141,6 +154,49 @@ export function moveOverlay(
     x: clamp(position.x + deltaX, 0, 1 - position.width),
     y: clamp(position.y + deltaY, 0, 1 - position.height),
   });
+}
+
+export function nudgeOverlay(
+  position: NormalizedRect,
+  deltaXPixels: number,
+  deltaYPixels: number,
+): NormalizedRect {
+  return moveOverlay(
+    position,
+    deltaXPixels / OUTPUT_WIDTH,
+    deltaYPixels / OUTPUT_HEIGHT,
+  );
+}
+
+export function anchorOverlay(
+  position: NormalizedRect,
+  anchor: OverlayAnchor,
+): NormalizedRect {
+  const horizontal = anchor.endsWith("left")
+    ? "left"
+    : anchor.endsWith("right")
+      ? "right"
+      : "center";
+  const vertical = anchor.startsWith("top")
+    ? "top"
+    : anchor.startsWith("bottom")
+      ? "bottom"
+      : "middle";
+  const marginX = Math.min(OUTPUT_SAFE_X_PX / OUTPUT_WIDTH, (1 - position.width) / 2);
+  const marginY = Math.min(OUTPUT_SAFE_Y_PX / OUTPUT_HEIGHT, (1 - position.height) / 2);
+  const x =
+    horizontal === "left"
+      ? marginX
+      : horizontal === "right"
+        ? 1 - position.width - marginX
+        : (1 - position.width) / 2;
+  const y =
+    vertical === "top"
+      ? marginY
+      : vertical === "bottom"
+        ? 1 - position.height - marginY
+        : (1 - position.height) / 2;
+  return roundRect({ ...position, x, y });
 }
 
 export function resizeOverlay(

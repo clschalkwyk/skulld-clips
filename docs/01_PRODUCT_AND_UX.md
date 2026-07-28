@@ -162,11 +162,17 @@ Skull’d sting properties:
 - replace MP4;
 - fixed `toasty-right` motion preset;
 - include verified clip audio;
-- reset to the bottom-right safe placement.
+- reset to the bottom-right safe placement;
+- choose one of nine safe-area anchors;
+- nudge by 1, 8, or 24 output pixels;
+- adjust left, top, and size with labelled sliders;
+- reveal exact normalized values only on demand.
 
 Only one sting is supported. Rust generates a bounded transparent PNG sprite
 with the fixed green-screen key for local preview; export remains authoritative
-and is covered by golden-frame tolerance.
+and is covered by golden-frame tolerance. Selecting a sting moves the playhead
+to a stable visible frame when the current playhead is outside its settled
+interval, so placement changes are immediately visible.
 
 Caption properties:
 

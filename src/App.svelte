@@ -35,6 +35,8 @@
     reorderOverlay,
     replaceOverlayAsset,
     replaceStingAsset,
+    STING_ENTRY_MS,
+    STING_EXIT_MS,
   } from "./services/overlay-model";
   import {
     cancelExport,
@@ -682,6 +684,21 @@
     const overlay = session?.project.overlays.find(
       ({ id: candidate }) => candidate === id,
     );
+    if (overlay?.type === "sting" && session) {
+      const visibleStart = Math.min(
+        overlay.endMs,
+        overlay.startMs + STING_ENTRY_MS,
+      );
+      const visibleEnd = Math.max(
+        visibleStart,
+        overlay.endMs - STING_EXIT_MS,
+      );
+      if (playheadMs < visibleStart || playheadMs > visibleEnd) {
+        updatePlayhead(
+          Math.round(visibleStart + (visibleEnd - visibleStart) / 2),
+        );
+      }
+    }
     if (!overlay || overlay.type !== "caption") {
       captionStatus = "idle";
     }
