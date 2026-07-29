@@ -42,9 +42,26 @@ npm run tauri dev
 
 The frontend dev server binds only to `127.0.0.1:1420`.
 
+## Optional YouTube performance
+
+Create a Google OAuth **Desktop app** client and enable the YouTube Data API v3
+and YouTube Analytics API. Start the app with the client ID; include the desktop
+client secret only when Google supplied one:
+
+```sh
+SKCF_YOUTUBE_CLIENT_ID=your-desktop-client-id \
+SKCF_YOUTUBE_CLIENT_SECRET=your-desktop-client-secret \
+npm run tauri dev
+```
+
+Do not commit the values or the downloaded OAuth client JSON. An unconfigured
+build shows an unavailable performance state and the editor remains fully
+offline-capable. A live YouTube smoke requires a user-authorized channel and is
+not part of automated CI.
+
 ## Implemented baseline
 
-Milestones M0–M6 implement:
+Milestones M0–M7 implement:
 
 - the least-privilege Tauri/Svelte/Rust boundary and stable typed contracts;
 - probing, versioned projects, autosave, recents and relink;
@@ -54,6 +71,8 @@ Milestones M0–M6 implement:
   output verification and atomic publication;
 - rotating redacted logs, explicit diagnostic ZIPs and startup cleanup;
 - generated media fixtures, decoded-frame golden checks and Windows package CI.
+- opt-in read-only YouTube channel connection, explicit project/video links,
+  cached owner-performance scorecards and daily history.
 
 The Windows CI package is an unsigned internal debug build and requires FFmpeg
 and ffprobe on `PATH`. It is not a public release. See `release/` for notices,

@@ -5,7 +5,7 @@
 1. Svelte presentation/edit state.
 2. Typed Tauri command/event bridge.
 3. Rust domain and application services.
-4. FFmpeg/ffprobe and local filesystem.
+4. FFmpeg/ffprobe, local filesystem and fixed opt-in YouTube APIs.
 
 ## Responsibilities
 
@@ -28,6 +28,7 @@ Does not own:
 - command construction;
 - path authorization;
 - export lifecycle.
+- OAuth tokens, generic HTTP, API URLs or analytics query construction.
 
 ### Rust commands
 
@@ -70,6 +71,17 @@ Thin adapters that:
 - verification;
 - atomic rename.
 
+### YouTube performance service
+
+- optional OAuth desktop-client configuration;
+- authorization code + PKCE + state through a bounded loopback callback;
+- refresh token in OS credential storage and access token in memory;
+- fixed Google OAuth, YouTube Data and YouTube Analytics endpoints;
+- 20-second HTTP timeout and two-MiB response cap;
+- connected-channel and video ownership validation;
+- versioned atomic app-local link/snapshot persistence;
+- no media upload, publishing action or frontend HTTP capability.
+
 ## Concurrency
 
 - webview state is single-threaded;
@@ -79,6 +91,8 @@ Thin adapters that:
 - saves can occur during preview;
 - running export uses an immutable snapshot;
 - later edits do not mutate the active job.
+- YouTube operations are serialized outside the UI thread;
+- performance refresh never blocks local edit/save/export operations.
 
 ## Process registry
 
@@ -149,6 +163,10 @@ Production uses pinned binaries with checksums and license/build records.
 
 The main window receives only required commands/plugins. It does not receive general shell spawn/execute permission.
 
+The YouTube integration also receives no frontend HTTP permission. Rust launches
+only its constructed Google OAuth URL in the system browser and accepts only the
+fixed typed performance commands.
+
 Future updater or secondary windows receive separate capabilities.
 
 ## Project migration
@@ -180,7 +198,8 @@ Structured fields:
 - sanitized detail;
 - duration.
 
-Never log full source paths, caption text, media data or unbounded command output.
+Never log full source paths, caption text, media data, OAuth values, channel or
+video metadata, performance metrics, or unbounded command/API output.
 
 ## Repository shape
 

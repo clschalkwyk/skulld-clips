@@ -10,6 +10,7 @@ Assets:
 - outputs;
 - filesystem permissions;
 - update trust.
+- optional YouTube credentials and owner analytics.
 
 | Threat | Control |
 |---|---|
@@ -23,16 +24,29 @@ Assets:
 | Private path leakage | Logging redaction |
 | Supply-chain compromise | Lockfiles, checksums, CI scanning |
 | Malicious update | No updater before signing |
+| OAuth interception/CSRF | System browser; loopback IP; PKCE; random state; fixed timeout |
+| Credential disclosure | Refresh token in OS credential store; access token in memory; no frontend token |
+| API abuse/data exfiltration | Fixed read-only scopes/endpoints/queries; response bounds; no media upload |
 
 ## Privacy
 
-- no account;
+- no account required for import, edit, save, reopen or export;
 - no media upload;
 - no telemetry;
-- no analytics;
 - no network required;
 - diagnostic bundle only on explicit action;
 - diagnostic bundle excludes media, artwork and caption text.
+
+The post-MVP YouTube performance workspace is an explicit exception:
+
+- opt-in Google OAuth with `youtube.readonly` and `yt-analytics.readonly`;
+- outbound requests only to fixed Google OAuth, YouTube Data API and YouTube
+  Analytics API endpoints;
+- cached channel/video metadata and owner analytics live outside project files;
+- disconnect removes the OS credential and cached performance data;
+- diagnostic bundles and logs exclude all OAuth, channel, video and performance
+  data;
+- an unconfigured or disconnected build preserves the fully offline core.
 
 ## Process controls
 
@@ -78,6 +92,9 @@ For internal development, a locally installed FFmpeg is acceptable. A random bun
 9. checksums;
 10. sign/publish only on protected release tags.
 
+Configured YouTube release candidates additionally require a real
+user-authorized Windows/macOS browser-callback and credential-store smoke.
+
 ## Release manifest
 
 Record:
@@ -92,6 +109,7 @@ Record:
 - app artifact SHA-256;
 - signing identity reference;
 - project schema version.
+- whether YouTube OAuth is configured, without recording the client ID.
 
 ## Logs
 

@@ -8,6 +8,8 @@ import {
   getRuntimeInfo,
   importOverlayAsset,
   importStingAsset,
+  linkProjectToYouTubeVideo,
+  listYouTubePerformance,
   loadProject,
   normalizeAppError,
   projectAssetPath,
@@ -16,6 +18,7 @@ import {
   selectExportDestination,
   selectDiagnosticDestination,
   startExport,
+  syncYouTubePerformance,
   validateExport,
   writeCaptionAsset,
   type InvokeFn,
@@ -52,6 +55,42 @@ describe("getRuntimeInfo", () => {
     };
 
     await expect(getRuntimeInfo(invokeCommand)).rejects.toEqual(nativeError);
+  });
+
+  it("keeps YouTube access behind typed native commands", async () => {
+    const invokeCommand = vi.fn(async () => ({})) as InvokeFn;
+
+    await linkProjectToYouTubeVideo(
+      "85b793a2-ac42-48f1-9f0e-b6fb57496388",
+      "Boss fight",
+      "https://youtube.com/shorts/dQw4w9WgXcQ",
+      invokeCommand,
+    );
+    await listYouTubePerformance(invokeCommand);
+    await syncYouTubePerformance(
+      "85b793a2-ac42-48f1-9f0e-b6fb57496388",
+      invokeCommand,
+    );
+
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      1,
+      "link_project_to_youtube_video",
+      {
+        projectId: "85b793a2-ac42-48f1-9f0e-b6fb57496388",
+        projectName: "Boss fight",
+        videoIdOrUrl: "https://youtube.com/shorts/dQw4w9WgXcQ",
+      },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      2,
+      "list_youtube_performance",
+      undefined,
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      3,
+      "sync_youtube_performance",
+      { projectId: "85b793a2-ac42-48f1-9f0e-b6fb57496388" },
+    );
   });
 });
 

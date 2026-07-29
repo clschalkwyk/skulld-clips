@@ -23,13 +23,17 @@ Included: one local source video, trim, locked 9:16 crop, static image overlays,
 rasterized caption overlays, one constrained Skull’d sting, project autosave,
 one export job, local MP4 output, progress and cancellation.
 
-Excluded: accounts, cloud, AI, transcription, publishing APIs, multiple video tracks, transitions, keyframes, collaboration, mobile apps and general-purpose frontend shell access.
+Excluded from the offline MVP: accounts, cloud, AI, transcription, publishing
+APIs, analytics, multiple video tracks, transitions, keyframes, collaboration,
+mobile apps and general-purpose frontend shell access. The implemented
+post-MVP YouTube performance workspace is opt-in and does not upload media or
+change the offline editor/export boundary.
 
 The project is meant to be useful and finishable. It is not meant to become Adobe Premiere after three enthusiastic evenings.
 
 ## Implementation status
 
-The repository now contains the runnable M0–M6 implementation:
+The repository now contains the runnable M0–M7 implementation:
 
 - local file import, safe ffprobe normalization, versioned projects, autosave,
   recents and relink;
@@ -41,6 +45,8 @@ The repository now contains the runnable M0–M6 implementation:
   cache/partial cleanup;
 - generated media fixtures, decoded-frame golden checks and an internal Windows
   package workflow.
+- read-only YouTube OAuth, explicit project-to-upload links, cached owner
+  scorecards and daily history behind a Rust-only network boundary.
 
 Start with [DEVELOPMENT.md](DEVELOPMENT.md) and review the
 [acceptance evidence](quality/ACCEPTANCE_STATUS.md). Public distribution remains

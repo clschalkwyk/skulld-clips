@@ -11,6 +11,7 @@
 | M4 | SCF-040–046 | validation, pure graph/args, one process registry, progress, process-tree cancellation, partial verification and atomic publication |
 | M5 | SCF-050–055 | generated fixture/golden suite, redacted logs, diagnostic ZIP exclusions, stale cleanup and installed Windows export/package smoke |
 | M6 | SCF-056–063 | up to eight bounded project-owned MP4 stings, Rust-owned green key with 1×/2×/3× once/repeat motion and multi-sting audio mix, transparent looping sprite preview, visible selection, safe-area anchors, pixel nudging, full-width canvas dock, compact layer rail, direct seconds-based timing with cycle presets and one-click playhead insertion, viewport-contained editor panels and decoded-frame/audio integration |
+| M7 | SCF-070 | opt-in read-only YouTube OAuth, OS credential storage, exact project/video ownership links, bounded cached owner scorecards and daily history behind a Rust-only network boundary |
 
 ## Local gates
 
@@ -31,3 +32,8 @@ The generated Windows artifact is an unsigned internal debug package. Public
 distribution is not complete until pinned/checksummed FFmpeg sidecars, matching
 source and licence records, legal review, signing and platform release smokes are
 complete. Those limits are recorded in `release/KNOWN_LIMITATIONS.md`.
+
+The YouTube integration is implemented but not live-verified in an authorized
+packaged build. Public enablement additionally requires Google OAuth consent
+configuration/verification and Windows/macOS browser-callback plus credential
+store smokes.

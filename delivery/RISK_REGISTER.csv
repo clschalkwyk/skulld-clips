@@ -8,3 +8,6 @@ R-006,Signing blocks distribution,High,Medium,Separate release milestone
 R-007,Font mismatch,Medium,Medium,Bundle/rasterize/golden tests
 R-008,Scope becomes full editor,High,High,Block non-goals until acceptance
 R-009,Hardware encoding inconsistency,Medium,Medium,CPU default; defer
+R-010,YouTube credential or owner-data disclosure,Low,High,OS credential store; Rust-only fixed endpoints; no logs/diagnostics; explicit disconnect clear
+R-011,Clip linked to the wrong upload,Medium,High,User confirms exact recent upload or URL; verify connected channel ownership; never guess
+R-012,YouTube API/metric drift,Medium,Medium,Core metrics; map returned headers; stable errors; live release smoke; refresh official API contract

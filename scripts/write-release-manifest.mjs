@@ -74,6 +74,7 @@ const manifest = {
   buildMode: "internal-unsigned-debug",
   signed: false,
   projectSchemaVersion: 1,
+  youtubeOauthConfigured: Boolean(process.env.SKCF_YOUTUBE_CLIENT_ID?.trim()),
   tools: {
     rustc: firstLine(command("rustc", ["--version"])),
     node: process.version,

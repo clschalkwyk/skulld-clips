@@ -18,6 +18,7 @@ not turn an unsigned internal package into a public release.
 | Rotated source | Covered | generated rotation metadata is normalized against display dimensions and exported through the orientation/crop graph |
 | Variable-frame-rate source | Covered | generated VFR/AAC media is normalized to verified CFR and audio/video duration drift stays within one frame plus 20 ms |
 | Offline operation | Waived for physical-network smoke | core workflow has no network commands, capabilities, accounts, uploads or telemetry; repeat the packaged click-through with networking disabled before public distribution |
+| Opt-in YouTube project performance | Partially covered | PKCE URL/callback/state, URL/video-ID validation, response bounds, channel-ownership rejection, returned-header metric mapping, atomic local catalog, stable errors and typed command boundary are automated; the macOS debug bundle shows the unconfigured state and keyboard-close behavior; real OAuth/query/credential-store smoke requires configured Google credentials and remains a release-candidate check |
 
 ## Platform evidence
 

@@ -38,3 +38,26 @@ Consulted 2026-07-26.
 - Legal/licensing: https://ffmpeg.org/legal.html
 
 Exact dependency versions and sidecar checksums must be pinned in the implementation repository and release manifest.
+
+## YouTube and Google OAuth
+
+Consulted 2026-07-29.
+
+- Desktop OAuth 2.0, PKCE and loopback redirects:
+  https://developers.google.com/identity/protocols/oauth2/native-app
+- YouTube Analytics authorization:
+  https://developers.google.com/youtube/reporting/guides/authorization
+- `reports.query` reference:
+  https://developers.google.com/youtube/analytics/reference/reports/query
+- Channel reports and compatible video metrics:
+  https://developers.google.com/youtube/analytics/channel_reports
+- Metric definitions, including engaged views and watch time:
+  https://developers.google.com/youtube/analytics/metrics
+- Analytics data model and returned-header requirement:
+  https://developers.google.com/youtube/analytics/data_model
+- YouTube Data API channel resource/uploads playlist:
+  https://developers.google.com/youtube/v3/docs/channels
+- Recent uploads through `playlistItems.list`:
+  https://developers.google.com/youtube/v3/docs/playlistItems/list
+- Data API quota and project setup:
+  https://developers.google.com/youtube/v3/getting-started

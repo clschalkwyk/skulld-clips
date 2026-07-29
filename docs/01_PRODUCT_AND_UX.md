@@ -111,6 +111,37 @@ Active export:
 - elapsed time;
 - cancel.
 
+### Channel performance
+
+This is a separate opt-in post-MVP workspace, available from Home and Editor. It
+does not sit in the export happy path.
+
+Disconnected/configuration states:
+
+- integration unavailable in this build;
+- no channel connected;
+- browser authorization active;
+- authorization denied/expired;
+- credential store unavailable;
+- network/API failure with retry guidance.
+
+Connected state:
+
+- connected channel title;
+- explicit disconnect-and-clear confirmation;
+- current project link state;
+- recent channel uploads with title and publish date;
+- YouTube URL/video-ID fallback;
+- manual refresh for one project or all linked projects;
+- scorecards for engaged views, total views, watch time, average duration,
+  average percentage viewed, interactions and net subscribers;
+- an accessible latest-fourteen-days table;
+- valid pending state when YouTube has not published report rows.
+
+The user always confirms the exact project/video link. The UI does not imply
+that matching titles or filenames proves provenance. Scorecards identify the
+last requested complete date and state that YouTube data may be delayed.
+
 ## Preview/crop interaction
 
 The preview stage uses the display-oriented source aspect ratio and fits within
@@ -243,6 +274,8 @@ Shortcuts do not trigger while typing, except Escape.
 - reduced-motion support;
 - errors not colour-only;
 - accessible button labels.
+- semantic metric tables and an equivalent non-visual reading order;
+- focus moves into the performance dialog and Escape closes it.
 
 ## Error UX
 

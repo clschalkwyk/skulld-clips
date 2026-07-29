@@ -200,6 +200,10 @@ export type AppErrorCode =
   | "E_EXPORT_ACTIVE"
   | "E_EXPORT_NOT_FOUND"
   | "E_EXPORT_CANCELLED"
+  | "E_INTEGRATION_UNAVAILABLE"
+  | "E_AUTH_REQUIRED"
+  | "E_NETWORK"
+  | "E_YOUTUBE_API"
   | "E_IO"
   | "E_INTERNAL";
 
@@ -224,6 +228,60 @@ export interface ExportValidation {
   warnings: string[];
   estimatedBytes: number | null;
   freeBytes: number | null;
+}
+
+export interface YouTubeChannel {
+  channelId: string;
+  title: string;
+}
+
+export interface YouTubeConnectionStatus {
+  configured: boolean;
+  authenticated: boolean;
+  channel: YouTubeChannel | null;
+  lastSyncedAt: string | null;
+}
+
+export interface YouTubeVideoCandidate {
+  videoId: string;
+  title: string;
+  publishedAt: string;
+}
+
+export interface YouTubePerformanceMetrics {
+  engagedViews: number;
+  views: number;
+  estimatedMinutesWatched: number;
+  averageViewDurationSeconds: number;
+  averageViewPercentage: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  subscribersGained: number;
+  subscribersLost: number;
+}
+
+export interface YouTubeDailyPerformance {
+  date: string;
+  metrics: YouTubePerformanceMetrics;
+}
+
+export interface YouTubePerformanceSnapshot {
+  startDate: string;
+  endDate: string;
+  syncedAt: string;
+  metrics: YouTubePerformanceMetrics;
+  daily: YouTubeDailyPerformance[];
+}
+
+export interface YouTubeProjectPerformance {
+  projectId: UUID;
+  projectName: string;
+  videoId: string;
+  videoTitle: string;
+  publishedAt: string;
+  linkedAt: string;
+  performance: YouTubePerformanceSnapshot | null;
 }
 
 export type ExportEvent =

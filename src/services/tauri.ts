@@ -17,6 +17,9 @@ import type {
   RelinkSourceResult,
   SaveProjectResult,
   StingAssetRef,
+  YouTubeConnectionStatus,
+  YouTubeProjectPerformance,
+  YouTubeVideoCandidate,
 } from "../../contracts/types";
 
 export interface StartExportResponse {
@@ -57,6 +60,10 @@ const APP_ERROR_CODES: ReadonlySet<AppErrorCode> = new Set([
   "E_EXPORT_ACTIVE",
   "E_EXPORT_NOT_FOUND",
   "E_EXPORT_CANCELLED",
+  "E_INTEGRATION_UNAVAILABLE",
+  "E_AUTH_REQUIRED",
+  "E_NETWORK",
+  "E_YOUTUBE_API",
   "E_IO",
   "E_INTERNAL",
 ]);
@@ -298,6 +305,68 @@ export function revealInFolder(
   invokeCommand: InvokeFn = invoke,
 ): Promise<RevealResponse> {
   return invokeNative("reveal_in_folder", { path }, invokeCommand);
+}
+
+export function getYouTubeConnectionStatus(
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeConnectionStatus> {
+  return invokeNative(
+    "get_youtube_connection_status",
+    undefined,
+    invokeCommand,
+  );
+}
+
+export function connectYouTubeChannel(
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeConnectionStatus> {
+  return invokeNative("connect_youtube_channel", undefined, invokeCommand);
+}
+
+export function disconnectYouTubeChannel(
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeConnectionStatus> {
+  return invokeNative("disconnect_youtube_channel", undefined, invokeCommand);
+}
+
+export function listRecentYouTubeUploads(
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeVideoCandidate[]> {
+  return invokeNative(
+    "list_recent_youtube_uploads",
+    undefined,
+    invokeCommand,
+  );
+}
+
+export function linkProjectToYouTubeVideo(
+  projectId: string,
+  projectName: string,
+  videoIdOrUrl: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeProjectPerformance> {
+  return invokeNative(
+    "link_project_to_youtube_video",
+    { projectId, projectName, videoIdOrUrl },
+    invokeCommand,
+  );
+}
+
+export function listYouTubePerformance(
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeProjectPerformance[]> {
+  return invokeNative("list_youtube_performance", undefined, invokeCommand);
+}
+
+export function syncYouTubePerformance(
+  projectId?: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubeProjectPerformance[]> {
+  return invokeNative(
+    "sync_youtube_performance",
+    { projectId: projectId ?? null },
+    invokeCommand,
+  );
 }
 
 export async function listenForExportEvents(

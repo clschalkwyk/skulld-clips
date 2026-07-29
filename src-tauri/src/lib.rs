@@ -22,9 +22,13 @@ pub fn run() {
 
             let log_dir = app.path().app_log_dir()?;
             app.manage(services::diagnostics::Diagnostics::new(log_dir));
+            let local_data = app.path().app_local_data_dir()?;
+            app.manage(services::youtube::YouTubePerformanceService::new(
+                local_data.clone(),
+            ));
             let diagnostics = app.state::<services::diagnostics::Diagnostics>();
             diagnostics.record("info", "application_started", None);
-            if let Ok(local_data) = app.path().app_local_data_dir() {
+            {
                 let report =
                     services::startup::cleanup_project_storage(&local_data.join("projects"));
                 if report.partial_files_removed > 0 || report.cache_entries_removed > 0 {
@@ -71,7 +75,14 @@ pub fn run() {
             commands::projects::relink_source,
             commands::projects::list_recent_projects,
             commands::projects::remove_recent_project,
-            commands::runtime::get_runtime_info
+            commands::runtime::get_runtime_info,
+            commands::youtube::get_youtube_connection_status,
+            commands::youtube::connect_youtube_channel,
+            commands::youtube::disconnect_youtube_channel,
+            commands::youtube::list_recent_youtube_uploads,
+            commands::youtube::link_project_to_youtube_video,
+            commands::youtube::list_youtube_performance,
+            commands::youtube::sync_youtube_performance
         ])
         .build(tauri::generate_context!())
         .expect("error while building Skull’d Clip Forge");

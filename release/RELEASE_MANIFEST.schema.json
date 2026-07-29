@@ -13,6 +13,7 @@
     "buildMode",
     "signed",
     "projectSchemaVersion",
+    "youtubeOauthConfigured",
     "tools",
     "bundledSidecars",
     "artifacts"
@@ -26,6 +27,7 @@
     "buildMode": { "const": "internal-unsigned-debug" },
     "signed": { "const": false },
     "projectSchemaVersion": { "const": 1 },
+    "youtubeOauthConfigured": { "type": "boolean" },
     "tools": {
       "type": "object",
       "additionalProperties": false,

@@ -3,6 +3,7 @@ mod export;
 mod media;
 mod project;
 mod runtime;
+mod youtube;
 
 pub use error::{AppError, AppErrorCode};
 pub use export::{
@@ -18,3 +19,8 @@ pub use project::{
 #[cfg(test)]
 pub use project::{OverlayBase, StingPreset};
 pub use runtime::RuntimeInfo;
+pub use youtube::{
+    AuthorizedChannel, YouTubeChannel, YouTubeConnectionStatus, YouTubeDailyPerformance,
+    YouTubePerformanceMetrics, YouTubePerformanceSnapshot, YouTubeProjectPerformance,
+    YouTubeVideoCandidate,
+};

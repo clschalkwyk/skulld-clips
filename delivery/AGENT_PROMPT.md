@@ -23,7 +23,9 @@ Read first:
 - Caption text rasterized to PNG.
 - One source and one active export.
 - Partial output, ffprobe verification, then atomic final rename.
-- No network/accounts/analytics/cloud/publishing.
+- No network/accounts/analytics/cloud/publishing in the core editor/export.
+- The approved M7 YouTube performance exception is opt-in, read-only,
+  Rust-owned, and constrained by `docs/05_YOUTUBE_PERFORMANCE.md`.
 
 ## Method
 

@@ -128,3 +128,19 @@ Feature: Build a branded vertical gameplay clip
     Given the device has no network
     When I import edit save reopen and export
     Then all core operations succeed
+
+  Scenario: Link a project to its YouTube performance
+    Given the build has a configured Google OAuth desktop client
+    And I connect a YouTube channel with both read-only scopes
+    And I opened the Clip Forge project that produced an uploaded video
+    When I select that exact video from recent uploads
+    Then the video is accepted only if it belongs to the connected channel
+    And the project-to-video link is stored outside the project file
+    When I refresh the linked video
+    Then the scorecard shows the defined aggregate owner metrics
+    And the daily table maps values using YouTube's returned column headers
+    And a new video with no rows shows a pending state
+    And no OAuth token is exposed to the frontend
+    When I disconnect and confirm clearing data
+    Then the OS credential and cached YouTube performance data are removed
+    And offline import edit save reopen and export still work

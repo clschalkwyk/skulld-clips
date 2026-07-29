@@ -17,3 +17,6 @@ SEC-001,No frontend shell,Capability audit
 SEC-002,Path containment,Traversal unit tests
 REL-001,Partial then final,Failed verification integration
 PRIV-001,No network/upload,Offline acceptance/capability audit
+FR-014,Optional YouTube project performance,OAuth/query/parser/link persistence unit tests and configured-channel smoke
+SEC-003,YouTube credential isolation,OS credential store; no token/frontend HTTP; bounded response tests
+PRIV-002,YouTube data minimization,No media/path/caption/token persistence; disconnect clear; diagnostic exclusion audit

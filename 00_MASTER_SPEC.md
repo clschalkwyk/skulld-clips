@@ -507,4 +507,11 @@ MVP is complete when a user can, fully offline:
 - batch processing;
 - optional publishing integrations.
 
+### Post-MVP extension implemented after acceptance
+
+- opt-in read-only YouTube owner analytics;
+- explicit Clip Forge project to YouTube video linking;
+- cached per-video scorecards and daily history;
+- no publishing, media upload, telemetry or frontend network capability.
+
 Do not begin roadmap work until MVP acceptance passes.

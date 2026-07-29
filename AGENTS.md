@@ -11,7 +11,7 @@ files below it.
 ## Current repository state
 
 - The repository contains the specification pack and a runnable Tauri 2, Svelte 5,
-  TypeScript, and Rust implementation covering milestones M0 through M5.
+  TypeScript, and Rust implementation covering milestones M0 through M7.
 - The app includes local import/probe, durable projects, trim/crop editing, raster
   overlays, verified FFmpeg export, cancellation, diagnostics, startup cleanup,
   generated media fixtures, and an internal Windows package workflow.
@@ -56,6 +56,11 @@ The MVP includes project autosave, reopen/relink, progress, cancellation, and lo
 diagnostics. It excludes accounts, cloud storage, analytics, AI, transcription,
 publishing APIs, multiple video tracks, transitions, keyframes, collaboration,
 mobile apps, plugins, and arbitrary frontend shell access.
+
+After MVP acceptance, M7 added an opt-in read-only YouTube performance workspace.
+It is not a publishing integration: Rust owns OAuth, fixed API calls, credential
+storage, explicit project/video linking and cached owner metrics. Core
+import/edit/save/reopen/export remains fully offline and account-free.
 
 Windows 11 x64 is the P0 release gate. macOS 13+ is P1. Linux is deferred.
 Do not start roadmap work until MVP acceptance passes.
@@ -137,7 +142,9 @@ explicitly selected.
   unbounded child-process output.
 - Diagnostic bundles are explicit user actions and must exclude source/output media,
   overlay artwork, and caption text.
-- Do not add telemetry, analytics, accounts, uploads, or network dependencies.
+- Do not add telemetry, uploads, required accounts or network dependencies to the
+  core workflow. The approved YouTube performance exception is opt-in, read-only,
+  Rust-owned and constrained by `docs/05_YOUTUBE_PERFORMANCE.md`.
 - Development may use `SKCF_FFMPEG_PATH` and `SKCF_FFPROBE_PATH`. Production binaries
   must be pinned and checksummed with build and licensing records.
 - Do not add an updater before signed update artifacts exist.

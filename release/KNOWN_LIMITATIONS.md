@@ -12,8 +12,15 @@ The current package is for internal evaluation, not public distribution.
 - Linux packaging is deferred.
 - Public release is blocked on a pinned, checksummed FFmpeg distribution,
   licence/source records, codec/legal review, and code signing.
-- There is no updater, account, cloud storage, telemetry, analytics, upload, AI,
-  transcription, or publishing integration.
+- There is no updater, required account, cloud storage, telemetry, media upload,
+  AI, transcription, or publishing integration.
+- The optional read-only YouTube performance workspace requires a configured
+  Google OAuth desktop client and authorized channel. The Rust OAuth/query
+  boundary and local states are implemented, but real packaged
+  Windows/macOS browser callback, OS credential-store, quota and owner-metric
+  smokes remain unverified in this internal build. Public enablement also
+  requires the applicable Google OAuth consent/verification and privacy-policy
+  work.
 - The editor supports one source video, one active export, static raster
   overlays, one fixed-preset Skull’d sting, and a fixed 1080×1920 H.264/AAC
   output. It does not support general video tracks, arbitrary keys or keyframes.

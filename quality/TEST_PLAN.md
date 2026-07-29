@@ -10,6 +10,7 @@
 - progress reducer;
 - autosave state;
 - error mapping.
+- typed YouTube command names/payloads and stable integration errors.
 
 ## Component tests
 
@@ -21,6 +22,7 @@
 - export validation;
 - cancellation UI;
 - relink flow.
+- YouTube unavailable, disconnected, linking, pending, error and scorecard states.
 
 ## Browser-harness E2E
 
@@ -45,6 +47,11 @@ Run Svelte against a mock Tauri adapter for fast workflow tests:
 - argument vector;
 - progress parser;
 - error sanitization.
+- OAuth URL PKCE/state/read-only scopes;
+- supported YouTube URL/video-ID parsing;
+- returned-header analytics metric mapping;
+- oversized API response rejection;
+- versioned YouTube catalog bounds and atomic persistence.
 
 ## Rust media integration tests
 
@@ -89,6 +96,12 @@ For fixture projects:
 - malformed JSON;
 - newer schema;
 - source replacement.
+- OAuth timeout/state mismatch/denial;
+- unavailable/locked OS credential store;
+- expired/revoked refresh token;
+- wrong-channel video;
+- YouTube 401/403/429/5xx and malformed/oversized responses;
+- newly published video with no report rows.
 
 ## CI gates
 
@@ -111,3 +124,5 @@ Release candidate:
 - sidecar checksum;
 - licence notices;
 - signing checks if public.
+- configured-channel OAuth, exact-link, analytics refresh, disconnect-clear and
+  packaged Windows/macOS credential-store smoke when YouTube is enabled.

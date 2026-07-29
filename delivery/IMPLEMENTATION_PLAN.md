@@ -126,6 +126,24 @@ Exit:
 - multiple stings can be imported or duplicated, previewed, saved, reopened and exported;
 - arbitrary video tracks, key settings and FFmpeg inputs remain unavailable.
 
+## Milestone 7 — Opt-in YouTube performance (5h)
+
+Deliver:
+
+- native OAuth desktop flow with PKCE, state and loopback timeout;
+- refresh token in the OS credential store;
+- exact project-to-owned-video linking through recent uploads or URL;
+- fixed aggregate and daily owner-analytics queries;
+- bounded atomic local snapshot storage;
+- connected, unconfigured, unauthorized, empty, pending, error and success UI.
+
+Exit:
+
+- an authorized channel can link a project to one of its videos and retrieve the
+  defined scorecard without exposing tokens or generic network access;
+- disconnect clears credentials and cached account/performance data;
+- the core editor/export continues to pass offline acceptance.
+
 ## Weekend cut (12–16h)
 
 Include only:

@@ -194,6 +194,49 @@ output: {
 }
 ```
 
+## Optional YouTube performance
+
+These commands exist only for the read-only post-MVP performance workspace.
+Rust owns OAuth, credentials, fixed endpoints, response bounds, channel
+ownership checks and local persistence. No token or generic HTTP request is
+exposed to the frontend.
+
+```ts
+get_youtube_connection_status(): YouTubeConnectionStatus
+connect_youtube_channel(): YouTubeConnectionStatus
+disconnect_youtube_channel(): YouTubeConnectionStatus
+list_recent_youtube_uploads(): YouTubeVideoCandidate[]
+list_youtube_performance(): YouTubeProjectPerformance[]
+```
+
+`connect_youtube_channel` opens the system browser, validates OAuth state and
+PKCE through a bounded loopback callback, stores the refresh token in the OS
+credential store, and loads the authorized channel. Disconnect removes both the
+credential and cached local performance data.
+
+```ts
+link_project_to_youtube_video({
+  projectId: UUID;
+  projectName: string;
+  videoIdOrUrl: string;
+}): YouTubeProjectPerformance
+```
+
+The native service accepts a supported YouTube URL or video ID, loads the video
+through the fixed Data API endpoint, and rejects it unless its channel ID equals
+the connected channel. It never guesses a link from filename, title, or time.
+
+```ts
+sync_youtube_performance({
+  projectId?: UUID | null;
+}): YouTubeProjectPerformance[]
+```
+
+With `projectId`, refresh exactly one linked video. Without it, refresh all
+linked videos, up to the local 100-link bound. Each snapshot contains an
+aggregate scorecard and daily rows through the last complete requested day.
+New uploads with no report rows return a valid zero/pending snapshot.
+
 ## Events
 
 ### `export://progress`

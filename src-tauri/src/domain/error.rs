@@ -31,6 +31,14 @@ pub enum AppErrorCode {
     ExportNotFound,
     #[serde(rename = "E_EXPORT_CANCELLED")]
     ExportCancelled,
+    #[serde(rename = "E_INTEGRATION_UNAVAILABLE")]
+    IntegrationUnavailable,
+    #[serde(rename = "E_AUTH_REQUIRED")]
+    AuthRequired,
+    #[serde(rename = "E_NETWORK")]
+    Network,
+    #[serde(rename = "E_YOUTUBE_API")]
+    YouTubeApi,
     #[serde(rename = "E_IO")]
     Io,
     #[serde(rename = "E_INTERNAL")]
@@ -170,6 +178,42 @@ impl AppError {
         }
     }
 
+    pub fn integration_unavailable(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::IntegrationUnavailable,
+            message: "YouTube performance is not configured in this build.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn auth_required(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::AuthRequired,
+            message: "Connect a YouTube channel to continue.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn network(safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::Network,
+            message: "YouTube could not be reached.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable: true,
+        }
+    }
+
+    pub fn youtube_api(safe_detail: impl Into<String>, retryable: bool) -> Self {
+        Self {
+            code: AppErrorCode::YouTubeApi,
+            message: "YouTube could not return channel performance.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable,
+        }
+    }
+
     pub fn media_tool_failed(tool: &str, safe_detail: impl Into<String>) -> Self {
         let code = match tool {
             "ffprobe" => AppErrorCode::FfprobeFailed,
@@ -215,6 +259,13 @@ mod tests {
             (AppErrorCode::ExportActive, "\"E_EXPORT_ACTIVE\""),
             (AppErrorCode::ExportNotFound, "\"E_EXPORT_NOT_FOUND\""),
             (AppErrorCode::ExportCancelled, "\"E_EXPORT_CANCELLED\""),
+            (
+                AppErrorCode::IntegrationUnavailable,
+                "\"E_INTEGRATION_UNAVAILABLE\"",
+            ),
+            (AppErrorCode::AuthRequired, "\"E_AUTH_REQUIRED\""),
+            (AppErrorCode::Network, "\"E_NETWORK\""),
+            (AppErrorCode::YouTubeApi, "\"E_YOUTUBE_API\""),
             (AppErrorCode::Io, "\"E_IO\""),
             (AppErrorCode::Internal, "\"E_INTERNAL\""),
         ];

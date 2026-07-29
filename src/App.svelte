@@ -17,6 +17,7 @@
   import PreviewStage from "./components/editor/PreviewStage.svelte";
   import Timeline from "./components/editor/Timeline.svelte";
   import ExportPanel from "./components/export/ExportPanel.svelte";
+  import PerformancePanel from "./components/performance/PerformancePanel.svelte";
   import type { RuntimeInfo } from "./contracts/runtime";
   import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
   import { renderCaption } from "./services/caption-renderer";
@@ -103,6 +104,7 @@
   let diagnosticBusy = $state(false);
   let diagnosticPath = $state<string | null>(null);
   let diagnosticError = $state<string | null>(null);
+  let performanceOpen = $state(false);
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
@@ -268,6 +270,7 @@
     diagnosticBusy = false;
     diagnosticPath = null;
     diagnosticError = null;
+    performanceOpen = false;
     autosave = createAutosaveScheduler(persistProject);
   }
 
@@ -291,6 +294,15 @@
       return;
     }
     exportOpen = false;
+  }
+
+  function openPerformance(): void {
+    playing = false;
+    performanceOpen = true;
+  }
+
+  function closePerformance(): void {
+    performanceOpen = false;
   }
 
   function updateExportSettings(settings: ExportSettings): void {
@@ -1157,6 +1169,13 @@
   }
 
   function handleShortcut(event: KeyboardEvent): void {
+    if (performanceOpen) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePerformance();
+      }
+      return;
+    }
     if (!session || (isTypingTarget(event.target) && event.key !== "Escape")) {
       return;
     }
@@ -1253,6 +1272,13 @@
               ? "Waiting to save"
               : "Save failed"}
       </span>
+      <button
+        class="secondary-button compact-button"
+        type="button"
+        onclick={openPerformance}
+      >
+        Performance
+      </button>
       <button
         class="primary-button"
         type="button"
@@ -1408,7 +1434,7 @@
     </section>
 
     <footer class="editor-footer">
-      <span>Milestone 6 · Skull’d sting workflow</span>
+      <span>Milestone 7 · YouTube performance</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
 
@@ -1441,7 +1467,12 @@
         <span class="brand-mark" aria-hidden="true">SCF</span>
         <span><strong>Skull’d</strong><small>Clip Forge</small></span>
       </div>
-      <span class="local-badge">Local only</span>
+      <div class="masthead-actions">
+        <span class="local-badge">Editor works offline</span>
+        <button class="secondary-button compact-button" type="button" onclick={openPerformance}>
+          Channel performance
+        </button>
+      </div>
     </header>
 
     <section class="home-hero" aria-labelledby="page-title">
@@ -1551,4 +1582,11 @@
       <span>Offline by design</span>
     </footer>
   </main>
+{/if}
+
+{#if performanceOpen}
+  <PerformancePanel
+    project={session ? { id: session.project.id, name: session.project.name } : null}
+    onClose={closePerformance}
+  />
 {/if}
