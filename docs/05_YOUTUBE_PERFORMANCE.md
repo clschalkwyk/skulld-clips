@@ -61,6 +61,10 @@ Rust owns:
 Svelte receives no token, client secret, raw API URL, generic HTTP capability, or
 arbitrary request parameters. It owns only connection controls, explicit
 project/video selection, loading/empty/error states, scorecards, and tables.
+While browser authorization is active, Svelte polls the native connection status
+at a bounded interval and renders the native `awaitingBrowser`,
+`exchangingToken`, and `loadingChannel` phases. Polling stops on success,
+failure, panel teardown, or shortly after the native three-minute timeout.
 
 ## Persistence and privacy
 
@@ -133,6 +137,10 @@ SKCF_YOUTUBE_CLIENT_SECRET  # only when supplied by the desktop OAuth client
 Both the YouTube Data API v3 and YouTube Analytics API must be enabled for the
 Google Cloud project. The OAuth client type is **Desktop app** and loopback IP
 redirects are used.
+
+If Google reports that a service is disabled, the app identifies the API used
+by the failing request: channel/video calls name YouTube Data API v3, while
+performance-report calls name YouTube Analytics API.
 
 Before public distribution:
 

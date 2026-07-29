@@ -7,11 +7,23 @@ pub struct YouTubeChannel {
     pub title: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum YouTubeConnectionPhase {
+    Disconnected,
+    AwaitingBrowser,
+    ExchangingToken,
+    LoadingChannel,
+    Connected,
+    Failed,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct YouTubeConnectionStatus {
     pub configured: bool,
     pub authenticated: bool,
+    pub connection_phase: YouTubeConnectionPhase,
     pub channel: Option<YouTubeChannel>,
     pub last_synced_at: Option<String>,
 }

@@ -2097,6 +2097,15 @@ kbd {
   color: #d8d0c7;
 }
 
+.performance-connection-status {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #d8d0c7;
+  font-size: 13px;
+}
+
 .performance-kicker {
   color: #ff6a47;
   font-size: 11px;

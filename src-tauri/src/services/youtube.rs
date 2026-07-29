@@ -21,9 +21,9 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::domain::{
-    AppError, AuthorizedChannel, YouTubeChannel, YouTubeConnectionStatus, YouTubeDailyPerformance,
-    YouTubePerformanceMetrics, YouTubePerformanceSnapshot, YouTubeProjectPerformance,
-    YouTubeVideoCandidate,
+    AppError, AuthorizedChannel, YouTubeChannel, YouTubeConnectionPhase, YouTubeConnectionStatus,
+    YouTubeDailyPerformance, YouTubePerformanceMetrics, YouTubePerformanceSnapshot,
+    YouTubeProjectPerformance, YouTubeVideoCandidate,
 };
 
 const CATALOG_VERSION: u8 = 1;
@@ -41,6 +41,13 @@ const MAX_RECENT_UPLOADS: usize = 25;
 const OAUTH_TIMEOUT: Duration = Duration::from_secs(180);
 const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 const METRICS: &str = "engagedViews,views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost";
+
+#[derive(Debug, Clone, Copy)]
+enum GoogleApiContext {
+    OAuth,
+    YouTubeData,
+    YouTubeAnalytics,
+}
 
 #[derive(Debug, Clone)]
 struct OAuthConfig {
@@ -101,6 +108,7 @@ impl Default for YouTubeCatalog {
 pub struct YouTubePerformanceService {
     catalog_path: PathBuf,
     access_token: Mutex<Option<CachedAccessToken>>,
+    connection_phase: Mutex<YouTubeConnectionPhase>,
     operation_lock: Mutex<()>,
 }
 
@@ -109,12 +117,12 @@ impl YouTubePerformanceService {
         Self {
             catalog_path: app_local_data_dir.join(CATALOG_FILENAME),
             access_token: Mutex::new(None),
+            connection_phase: Mutex::new(YouTubeConnectionPhase::Disconnected),
             operation_lock: Mutex::new(()),
         }
     }
 
     pub fn connection_status(&self) -> Result<YouTubeConnectionStatus, AppError> {
-        let _operation = self.lock_operations()?;
         let catalog = self.load_catalog()?;
         let last_synced_at = catalog
             .links
@@ -126,9 +134,16 @@ impl YouTubePerformanceService {
             })
             .max()
             .map(str::to_owned);
+        let authenticated = catalog.connection.is_some();
+        let connection_phase = if authenticated {
+            YouTubeConnectionPhase::Connected
+        } else {
+            self.connection_phase()?
+        };
         Ok(YouTubeConnectionStatus {
             configured: OAuthConfig::from_environment().is_some(),
-            authenticated: catalog.connection.is_some(),
+            authenticated,
+            connection_phase,
             channel: catalog.connection.map(|connection| connection.channel),
             last_synced_at,
         })
@@ -137,60 +152,73 @@ impl YouTubePerformanceService {
     pub fn connect(&self) -> Result<YouTubeConnectionStatus, AppError> {
         let _operation = self.lock_operations()?;
         let config = configured_oauth()?;
-        let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|_| {
-            AppError::network(
-                "The local OAuth callback could not start. Check local firewall settings.",
-            )
-        })?;
-        let redirect_uri = format!(
-            "http://127.0.0.1:{}/oauth/callback",
-            listener
-                .local_addr()
-                .map_err(|_| AppError::network("The OAuth callback address is unavailable."))?
-                .port()
-        );
-        let state = Uuid::new_v4().to_string();
-        let code_verifier = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
-        let code_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(code_verifier.as_bytes()));
-        let authorization_url =
-            build_authorization_url(&config.client_id, &redirect_uri, &state, &code_challenge)?;
+        self.set_connection_phase(YouTubeConnectionPhase::AwaitingBrowser)?;
+        let result = (|| {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|_| {
+                AppError::network(
+                    "The local OAuth callback could not start. Check local firewall settings.",
+                )
+            })?;
+            let redirect_uri = format!(
+                "http://127.0.0.1:{}/oauth/callback",
+                listener
+                    .local_addr()
+                    .map_err(|_| AppError::network("The OAuth callback address is unavailable."))?
+                    .port()
+            );
+            let state = Uuid::new_v4().to_string();
+            let code_verifier = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+            let code_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(code_verifier.as_bytes()));
+            let authorization_url =
+                build_authorization_url(&config.client_id, &redirect_uri, &state, &code_challenge)?;
 
-        webbrowser::open(authorization_url.as_str()).map_err(|_| {
-            AppError::network("The system browser could not open. Set a default browser and retry.")
-        })?;
-        let authorization_code = receive_oauth_callback(listener, &state, OAUTH_TIMEOUT)?;
-        let token = exchange_authorization_code(
-            &self.http_client()?,
-            &config,
-            &authorization_code,
-            &redirect_uri,
-            &code_verifier,
-        )?;
-        let refresh_token = token.refresh_token.ok_or_else(|| {
-            AppError::auth_required(
-                "Google did not issue offline access. Reconnect and approve both read-only scopes.",
-            )
-        })?;
-        let channel = fetch_authorized_channel(&self.http_client()?, &token.access_token)?;
-        save_refresh_token(&refresh_token)?;
-        let mut catalog = self.load_catalog()?;
-        catalog.connection = Some(StoredConnection {
-            channel: channel.channel.clone(),
-            uploads_playlist_id: channel.uploads_playlist_id,
-        });
-        catalog.links.clear();
-        if let Err(error) = self.save_catalog(&catalog) {
-            let _ = delete_refresh_token();
-            return Err(error);
+            webbrowser::open(authorization_url.as_str()).map_err(|_| {
+                AppError::network(
+                    "The system browser could not open. Set a default browser and retry.",
+                )
+            })?;
+            let authorization_code = receive_oauth_callback(listener, &state, OAUTH_TIMEOUT)?;
+            self.set_connection_phase(YouTubeConnectionPhase::ExchangingToken)?;
+            let token = exchange_authorization_code(
+                &self.http_client()?,
+                &config,
+                &authorization_code,
+                &redirect_uri,
+                &code_verifier,
+            )?;
+            let refresh_token = token.refresh_token.ok_or_else(|| {
+                AppError::auth_required(
+                    "Google did not issue offline access. Reconnect and approve both read-only scopes.",
+                )
+            })?;
+            self.set_connection_phase(YouTubeConnectionPhase::LoadingChannel)?;
+            let channel = fetch_authorized_channel(&self.http_client()?, &token.access_token)?;
+            save_refresh_token(&refresh_token)?;
+            let mut catalog = self.load_catalog()?;
+            catalog.connection = Some(StoredConnection {
+                channel: channel.channel.clone(),
+                uploads_playlist_id: channel.uploads_playlist_id,
+            });
+            catalog.links.clear();
+            if let Err(error) = self.save_catalog(&catalog) {
+                let _ = delete_refresh_token();
+                return Err(error);
+            }
+            self.cache_access_token(&token.access_token, token.expires_in)?;
+            self.set_connection_phase(YouTubeConnectionPhase::Connected)?;
+
+            Ok(YouTubeConnectionStatus {
+                configured: true,
+                authenticated: true,
+                connection_phase: YouTubeConnectionPhase::Connected,
+                channel: Some(channel.channel),
+                last_synced_at: None,
+            })
+        })();
+        if result.is_err() {
+            let _ = self.set_connection_phase(YouTubeConnectionPhase::Failed);
         }
-        self.cache_access_token(&token.access_token, token.expires_in)?;
-
-        Ok(YouTubeConnectionStatus {
-            configured: true,
-            authenticated: true,
-            channel: Some(channel.channel),
-            last_synced_at: None,
-        })
+        result
     }
 
     pub fn disconnect(&self) -> Result<YouTubeConnectionStatus, AppError> {
@@ -214,9 +242,11 @@ impl YouTubePerformanceService {
                 })?;
             }
         }
+        self.set_connection_phase(YouTubeConnectionPhase::Disconnected)?;
         Ok(YouTubeConnectionStatus {
             configured: OAuthConfig::from_environment().is_some(),
             authenticated: false,
+            connection_phase: YouTubeConnectionPhase::Disconnected,
             channel: None,
             last_synced_at: None,
         })
@@ -368,6 +398,21 @@ impl YouTubePerformanceService {
             .user_agent("Skulld-Clip-Forge/0.1")
             .build()
             .map_err(|_| AppError::network("The secure HTTP client could not start."))
+    }
+
+    fn connection_phase(&self) -> Result<YouTubeConnectionPhase, AppError> {
+        self.connection_phase
+            .lock()
+            .map(|phase| *phase)
+            .map_err(|_| AppError::internal("YouTube connection state is unavailable."))
+    }
+
+    fn set_connection_phase(&self, phase: YouTubeConnectionPhase) -> Result<(), AppError> {
+        *self
+            .connection_phase
+            .lock()
+            .map_err(|_| AppError::internal("YouTube connection state is unavailable."))? = phase;
+        Ok(())
     }
 
     fn lock_operations(&self) -> Result<std::sync::MutexGuard<'_, ()>, AppError> {
@@ -552,7 +597,7 @@ fn read_http_request_head(reader: &mut impl Read) -> Result<String, AppError> {
                 if matches!(
                     error.kind(),
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) && !bytes.is_empty() =>
+                ) =>
             {
                 break;
             }
@@ -644,7 +689,11 @@ fn exchange_authorization_code(
         .form(&form)
         .send()
         .map_err(|_| AppError::network("The OAuth token exchange failed. Retry connection."))?;
-    decode_google_response(response, "YouTube authorization failed.")
+    decode_google_response(
+        response,
+        "YouTube authorization failed.",
+        GoogleApiContext::OAuth,
+    )
 }
 
 fn refresh_access_token(
@@ -665,7 +714,11 @@ fn refresh_access_token(
         .form(&form)
         .send()
         .map_err(|_| AppError::network("The YouTube session could not be refreshed."))?;
-    decode_google_response(response, "Reconnect the YouTube channel.")
+    decode_google_response(
+        response,
+        "Reconnect the YouTube channel.",
+        GoogleApiContext::OAuth,
+    )
 }
 
 fn save_refresh_token(refresh_token: &str) -> Result<(), AppError> {
@@ -744,8 +797,11 @@ fn fetch_authorized_channel(
         .query(&[("part", "snippet,contentDetails"), ("mine", "true")])
         .send()
         .map_err(|_| AppError::network("The authorized YouTube channel could not be loaded."))?;
-    let mut channels: ChannelListResponse =
-        decode_google_response(response, "The authorized YouTube channel is unavailable.")?;
+    let mut channels: ChannelListResponse = decode_google_response(
+        response,
+        "The authorized YouTube channel is unavailable.",
+        GoogleApiContext::YouTubeData,
+    )?;
     let channel = channels.items.pop().ok_or_else(|| {
         AppError::youtube_api(
             "The Google account does not expose an authorized YouTube channel.",
@@ -802,8 +858,11 @@ fn fetch_recent_uploads(
         ])
         .send()
         .map_err(|_| AppError::network("Recent YouTube uploads could not be loaded."))?;
-    let uploads: PlaylistItemsResponse =
-        decode_google_response(response, "Recent YouTube uploads are unavailable.")?;
+    let uploads: PlaylistItemsResponse = decode_google_response(
+        response,
+        "Recent YouTube uploads are unavailable.",
+        GoogleApiContext::YouTubeData,
+    )?;
     Ok(uploads
         .items
         .into_iter()
@@ -848,8 +907,11 @@ fn fetch_video(
         .query(&[("part", "snippet"), ("id", video_id)])
         .send()
         .map_err(|_| AppError::network("The selected YouTube video could not be loaded."))?;
-    let mut videos: VideoListResponse =
-        decode_google_response(response, "The selected YouTube video is unavailable.")?;
+    let mut videos: VideoListResponse = decode_google_response(
+        response,
+        "The selected YouTube video is unavailable.",
+        GoogleApiContext::YouTubeData,
+    )?;
     let video = videos.items.pop().ok_or_else(|| {
         AppError::youtube_api(
             "No accessible YouTube video matches that URL or video ID.",
@@ -976,6 +1038,7 @@ fn query_analytics(
     decode_google_response(
         response,
         "YouTube Analytics rejected the performance query.",
+        GoogleApiContext::YouTubeAnalytics,
     )
 }
 
@@ -1045,10 +1108,11 @@ fn metrics_from_row(
 fn decode_google_response<T: DeserializeOwned>(
     response: Response,
     safe_detail: &str,
+    api: GoogleApiContext,
 ) -> Result<T, AppError> {
     let status = response.status();
     let content_length = response.content_length();
-    decode_google_body(status, content_length, response, safe_detail)
+    decode_google_body(status, content_length, response, safe_detail, api)
 }
 
 fn decode_google_body<T: DeserializeOwned, R: Read>(
@@ -1056,6 +1120,7 @@ fn decode_google_body<T: DeserializeOwned, R: Read>(
     content_length: Option<u64>,
     reader: R,
     safe_detail: &str,
+    api: GoogleApiContext,
 ) -> Result<T, AppError> {
     if let Some(length) = content_length {
         if length > MAX_RESPONSE_BYTES {
@@ -1087,11 +1152,54 @@ fn decode_google_body<T: DeserializeOwned, R: Read>(
             status if status.is_server_error() => {
                 AppError::youtube_api("YouTube is temporarily unavailable. Retry later.", true)
             }
-            _ => AppError::youtube_api(safe_detail, false),
+            _ => AppError::youtube_api(google_error_safe_detail(&bytes, safe_detail, api), false),
         });
     }
     serde_json::from_slice(&bytes)
         .map_err(|_| AppError::youtube_api("YouTube returned an invalid response.", true))
+}
+
+fn google_error_safe_detail(bytes: &[u8], fallback: &str, api: GoogleApiContext) -> String {
+    let Ok(body) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return fallback.to_owned();
+    };
+    let reason = body
+        .pointer("/error/errors/0/reason")
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| body.get("error").and_then(serde_json::Value::as_str));
+    match reason {
+        Some("accessNotConfigured" | "serviceDisabled") => match api {
+            GoogleApiContext::YouTubeData => {
+                "Enable the YouTube Data API v3 for this OAuth client's Google Cloud project, then retry."
+                    .to_owned()
+            }
+            GoogleApiContext::YouTubeAnalytics => {
+                "Enable the YouTube Analytics API for this OAuth client's Google Cloud project, then retry."
+                    .to_owned()
+            }
+            GoogleApiContext::OAuth => fallback.to_owned(),
+        },
+        Some("youtubeSignupRequired") => {
+            "The authorized Google account has no YouTube channel. Reconnect with the account that owns the channel."
+                .to_owned()
+        }
+        Some("quotaExceeded" | "dailyLimitExceeded") => {
+            "The YouTube API quota is exhausted. Retry after the quota resets.".to_owned()
+        }
+        Some("insufficientPermissions" | "forbidden") => {
+            "The authorized account cannot access this YouTube channel. Reconnect with the channel owner account."
+                .to_owned()
+        }
+        Some("invalid_client") => {
+            "Google rejected this OAuth desktop client. Recreate the client credential and retry."
+                .to_owned()
+        }
+        Some("invalid_grant") => {
+            "Google rejected the expired or already-used authorization. Start a fresh connection."
+                .to_owned()
+        }
+        _ => fallback.to_owned(),
+    }
 }
 
 fn parse_video_id(value: &str) -> Result<String, AppError> {
@@ -1181,14 +1289,18 @@ fn now_rfc3339() -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, io::Cursor};
+    use std::{
+        fs,
+        io::{self, Cursor, Read},
+    };
 
     use super::{
         analytics_daily, analytics_totals, build_authorization_url, decode_google_body,
-        parse_oauth_callback_target, parse_video_id, read_http_request_head,
-        video_candidate_for_channel, AnalyticsResponse, VideoResource, YouTubeCatalog,
-        YouTubePerformanceService, MAX_RESPONSE_BYTES,
+        google_error_safe_detail, parse_oauth_callback_target, parse_video_id,
+        read_http_request_head, video_candidate_for_channel, AnalyticsResponse, GoogleApiContext,
+        VideoResource, YouTubeCatalog, YouTubePerformanceService, MAX_RESPONSE_BYTES,
     };
+    use crate::domain::YouTubeConnectionPhase;
 
     #[test]
     fn authorization_url_uses_pkce_and_read_only_scopes() {
@@ -1248,6 +1360,62 @@ mod tests {
     }
 
     #[test]
+    fn callback_reader_ignores_an_empty_browser_probe() {
+        struct EmptyTimeoutReader;
+
+        impl Read for EmptyTimeoutReader {
+            fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+                Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "browser probe sent no request",
+                ))
+            }
+        }
+
+        assert_eq!(read_http_request_head(&mut EmptyTimeoutReader).unwrap(), "");
+    }
+
+    #[test]
+    fn connection_status_exposes_transient_browser_phase() {
+        let root = std::env::temp_dir().join(format!("skcf-youtube-{}", uuid::Uuid::new_v4()));
+        let service = YouTubePerformanceService::new(root);
+
+        service
+            .set_connection_phase(YouTubeConnectionPhase::AwaitingBrowser)
+            .unwrap();
+
+        assert_eq!(
+            service.connection_status().unwrap().connection_phase,
+            YouTubeConnectionPhase::AwaitingBrowser
+        );
+    }
+
+    #[test]
+    fn google_error_detail_maps_disabled_api_without_exposing_response() {
+        let body = br#"{
+            "error": {
+                "message": "YouTube Data API v3 has not been used in project 123456.",
+                "errors": [{"reason": "accessNotConfigured"}]
+            }
+        }"#;
+
+        let data_detail = google_error_safe_detail(body, "fallback", GoogleApiContext::YouTubeData);
+        let analytics_detail =
+            google_error_safe_detail(body, "fallback", GoogleApiContext::YouTubeAnalytics);
+
+        assert_eq!(
+            data_detail,
+            "Enable the YouTube Data API v3 for this OAuth client's Google Cloud project, then retry."
+        );
+        assert_eq!(
+            analytics_detail,
+            "Enable the YouTube Analytics API for this OAuth client's Google Cloud project, then retry."
+        );
+        assert!(!data_detail.contains("123456"));
+        assert!(!analytics_detail.contains("123456"));
+    }
+
+    #[test]
     fn analytics_rows_map_by_header_name() {
         let response: AnalyticsResponse = serde_json::from_value(serde_json::json!({
             "columnHeaders": [
@@ -1292,6 +1460,7 @@ mod tests {
             None,
             Cursor::new(body),
             "failed",
+            GoogleApiContext::YouTubeData,
         )
         .is_err());
     }

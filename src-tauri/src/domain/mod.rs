@@ -20,7 +20,7 @@ pub use project::{
 pub use project::{OverlayBase, StingPreset};
 pub use runtime::RuntimeInfo;
 pub use youtube::{
-    AuthorizedChannel, YouTubeChannel, YouTubeConnectionStatus, YouTubeDailyPerformance,
-    YouTubePerformanceMetrics, YouTubePerformanceSnapshot, YouTubeProjectPerformance,
-    YouTubeVideoCandidate,
+    AuthorizedChannel, YouTubeChannel, YouTubeConnectionPhase, YouTubeConnectionStatus,
+    YouTubeDailyPerformance, YouTubePerformanceMetrics, YouTubePerformanceSnapshot,
+    YouTubeProjectPerformance, YouTubeVideoCandidate,
 };

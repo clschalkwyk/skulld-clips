@@ -235,9 +235,18 @@ export interface YouTubeChannel {
   title: string;
 }
 
+export type YouTubeConnectionPhase =
+  | "disconnected"
+  | "awaitingBrowser"
+  | "exchangingToken"
+  | "loadingChannel"
+  | "connected"
+  | "failed";
+
 export interface YouTubeConnectionStatus {
   configured: boolean;
   authenticated: boolean;
+  connectionPhase: YouTubeConnectionPhase;
   channel: YouTubeChannel | null;
   lastSyncedAt: string | null;
 }

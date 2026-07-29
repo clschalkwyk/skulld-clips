@@ -18,6 +18,11 @@
     normalizeAppError,
     syncYouTubePerformance,
   } from "../../services/tauri";
+  import {
+    isYouTubeConnectionPending,
+    pollYouTubeConnectionStatus,
+    youtubeConnectionPhaseLabel,
+  } from "../../services/youtube-connection";
 
   interface Props {
     project: { id: string; name: string } | null;
@@ -37,6 +42,9 @@
   let closeButton: HTMLButtonElement;
   let selectedProjectId = $state<string | null>(null);
   let relinking = $state(false);
+  let connectionPoll: AbortController | null = null;
+  let connectRequestActive = false;
+  let disposed = false;
 
   const activeLink = $derived(
     project
@@ -50,6 +58,10 @@
   onMount(() => {
     closeButton.focus();
     void loadWorkspace();
+    return () => {
+      disposed = true;
+      stopConnectionPolling();
+    };
   });
 
   async function loadWorkspace(): Promise<void> {
@@ -64,6 +76,9 @@
       links = saved;
       if (connection.authenticated) {
         await loadUploads();
+      } else if (isYouTubeConnectionPending(connection.connectionPhase)) {
+        busyAction = "connect";
+        startConnectionPolling();
       }
     } catch (caught) {
       error = normalizeAppError(caught);
@@ -75,15 +90,65 @@
   async function connect(): Promise<void> {
     busyAction = "connect";
     error = null;
+    connectRequestActive = true;
+    startConnectionPolling();
     try {
-      status = await connectYouTubeChannel();
+      const connection = await connectYouTubeChannel();
+      if (disposed) {
+        return;
+      }
+      status = connection;
       links = [];
       await loadUploads();
     } catch (caught) {
-      error = normalizeAppError(caught);
+      if (!disposed) {
+        error = normalizeAppError(caught);
+        try {
+          status = await getYouTubeConnectionStatus();
+        } catch {
+          // Preserve the actionable error returned by the connect command.
+        }
+      }
     } finally {
-      busyAction = null;
+      connectRequestActive = false;
+      stopConnectionPolling();
+      if (!disposed) {
+        busyAction = null;
+      }
     }
+  }
+
+  function startConnectionPolling(): void {
+    stopConnectionPolling();
+    const controller = new AbortController();
+    connectionPoll = controller;
+    void pollYouTubeConnectionStatus({
+      readStatus: getYouTubeConnectionStatus,
+      onStatus: (connection) => {
+        if (!disposed && connectionPoll === controller) {
+          status = connection;
+        }
+      },
+      signal: controller.signal,
+    }).then((connection) => {
+      if (
+        disposed ||
+        connectionPoll !== controller ||
+        connectRequestActive
+      ) {
+        return;
+      }
+      connectionPoll = null;
+      busyAction = null;
+      if (connection?.authenticated) {
+        void loadUploads();
+      }
+    });
+  }
+
+  function stopConnectionPolling(): void {
+    connectionPoll?.abort();
+    connectionPoll = null;
   }
 
   async function disconnect(): Promise<void> {
@@ -236,13 +301,21 @@
           Connect with read-only access. Clip Forge stores the refresh token in
           the operating-system credential store and never uploads media.
         </p>
+        {#if busyAction === "connect"}
+          <div class="performance-connection-status" role="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>
+              {youtubeConnectionPhaseLabel(status.connectionPhase)}
+            </span>
+          </div>
+        {/if}
         <button
           class="primary-button"
           type="button"
           onclick={connect}
           disabled={busyAction !== null}
         >
-          {busyAction === "connect" ? "Finish in browser…" : "Connect YouTube channel"}
+          {busyAction === "connect" ? "Connection in progress…" : "Connect YouTube channel"}
         </button>
       </div>
     {:else}

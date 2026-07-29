@@ -214,6 +214,12 @@ PKCE through a bounded loopback callback, stores the refresh token in the OS
 credential store, and loads the authorized channel. Disconnect removes both the
 credential and cached local performance data.
 
+`YouTubeConnectionStatus.connectionPhase` is one of `disconnected`,
+`awaitingBrowser`, `exchangingToken`, `loadingChannel`, `connected`, or
+`failed`. `get_youtube_connection_status` remains non-blocking while the
+serialized connect operation runs so the frontend can poll this phase without
+receiving tokens or generic network capability.
+
 ```ts
 link_project_to_youtube_video({
   projectId: UUID;

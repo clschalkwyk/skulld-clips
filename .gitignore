@@ -13,3 +13,6 @@ src-tauri/gen/
 .env
 .env.*
 !.env.example
+
+# Local Google Desktop OAuth credentials
+*_client_secret_*.apps.googleusercontent.com.json
