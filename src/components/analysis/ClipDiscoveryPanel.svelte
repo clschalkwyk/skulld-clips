@@ -3,13 +3,20 @@
 
   import type { ClipCandidate, ClipEventKind } from "../../../contracts/types";
   import type { ClipAnalysisState } from "../../services/clip-analysis-state";
-  import { clipAnalysisIsActive } from "../../services/clip-analysis-state";
+  import {
+    applyMomentExtractionWindow,
+    clipAnalysisIsActive,
+    validateMomentExtractionWindow,
+  } from "../../services/clip-analysis-state";
   import { formatTimelineTime } from "../../services/timeline";
 
   interface Props {
     sourceFilename: string;
     sourceUrl: string | null;
+    sourceDurationMs: number;
     analysisState: ClipAnalysisState;
+    momentExtractStartTimeSeconds: number;
+    momentExtractEndTimeSeconds: number;
     onStart: () => Promise<void>;
     onCancel: () => Promise<void>;
     onApply: (candidate: ClipCandidate) => void;
@@ -19,7 +26,10 @@
   let {
     sourceFilename,
     sourceUrl,
+    sourceDurationMs,
     analysisState,
+    momentExtractStartTimeSeconds = $bindable(),
+    momentExtractEndTimeSeconds = $bindable(),
     onStart,
     onCancel,
     onApply,
@@ -29,6 +39,13 @@
   let closeButton = $state<HTMLButtonElement>();
   let reviewVideo = $state<HTMLVideoElement>();
   let reviewedCandidate = $state<ClipCandidate | null>(null);
+  let momentExtractionWindow = $derived({
+    momentExtractStartTimeMs: momentExtractStartTimeSeconds * 1_000,
+    momentExtractEndTimeMs: momentExtractEndTimeSeconds * 1_000,
+  });
+  let extractionWindowError = $derived(
+    validateMomentExtractionWindow(momentExtractionWindow),
+  );
 
   onMount(() => {
     closeButton?.focus();
@@ -61,6 +78,14 @@
     }
     reviewVideo.pause();
     reviewVideo.currentTime = reviewedCandidate.eventMs / 1_000;
+  }
+
+  function configuredCandidate(candidate: ClipCandidate): ClipCandidate {
+    return applyMomentExtractionWindow(
+      candidate,
+      sourceDurationMs,
+      momentExtractionWindow,
+    );
   }
 </script>
 
@@ -104,6 +129,61 @@
         {analysisState.status === "idle" ? "Scan source" : "Scan again"}
       </button>
     </div>
+
+    <section
+      class="analysis-extraction-window"
+      aria-labelledby="analysis-extraction-window-heading"
+    >
+      <div class="analysis-extraction-heading">
+        <div>
+          <p class="section-label">Moment extraction window</p>
+          <h3 id="analysis-extraction-window-heading">Keep the lead-up and aftermath</h3>
+        </div>
+        <span>Defaults: 15s before · 5s after</span>
+      </div>
+      <div class="analysis-extraction-fields">
+        <label for="moment-extract-start-time">
+          <span>Before moment</span>
+          <span class="analysis-number-input">
+            <input
+              id="moment-extract-start-time"
+              name="moment-extract-start-time"
+              type="number"
+              min="0"
+              max="300"
+              step="0.5"
+              bind:value={momentExtractStartTimeSeconds}
+              aria-describedby="moment-extraction-help moment-extraction-error"
+            />
+            <small>seconds</small>
+          </span>
+        </label>
+        <label for="moment-extract-end-time">
+          <span>After moment</span>
+          <span class="analysis-number-input">
+            <input
+              id="moment-extract-end-time"
+              name="moment-extract-end-time"
+              type="number"
+              min="0"
+              max="300"
+              step="0.5"
+              bind:value={momentExtractEndTimeSeconds}
+              aria-describedby="moment-extraction-help moment-extraction-error"
+            />
+            <small>seconds</small>
+          </span>
+        </label>
+      </div>
+      <p id="moment-extraction-help">
+        Suggested ranges update immediately. Detection does not need to run again.
+      </p>
+      {#if extractionWindowError}
+        <p id="moment-extraction-error" class="field-error" role="alert">
+          {extractionWindowError}
+        </p>
+      {/if}
+    </section>
 
     {#if clipAnalysisIsActive(analysisState)}
       <section class="analysis-progress" aria-live="polite">
@@ -178,6 +258,7 @@
 
         <div class="analysis-candidate-list">
           {#each analysisState.candidates as candidate (candidate.id)}
+            {@const windowedCandidate = configuredCandidate(candidate)}
             <article class={`analysis-candidate analysis-${candidate.kind}`}>
               <div class="analysis-candidate-heading">
                 <div>
@@ -191,8 +272,8 @@
                 <div>
                   <dt>Suggested range</dt>
                   <dd>
-                    {formatTimelineTime(candidate.suggestedInMs)} →
-                    {formatTimelineTime(candidate.suggestedOutMs)}
+                    {formatTimelineTime(windowedCandidate.suggestedInMs)} →
+                    {formatTimelineTime(windowedCandidate.suggestedOutMs)}
                   </dd>
                 </div>
               </dl>
@@ -207,7 +288,8 @@
                 <button
                   class="primary-button"
                   type="button"
-                  onclick={() => onApply(candidate)}
+                  onclick={() => onApply(windowedCandidate)}
+                  disabled={extractionWindowError !== null}
                 >
                   Use suggested range
                 </button>

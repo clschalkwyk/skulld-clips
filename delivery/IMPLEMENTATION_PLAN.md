@@ -153,12 +153,16 @@ Deliver:
 - deterministic completion/title, player-death and persistent wide boss-bar
   classifiers;
 - bounded candidate grouping with confidence and suggested ranges;
+- detected point/interval anchors with validated before/after extraction controls
+  defaulting to 15 seconds and 5 seconds;
 - in-panel source review and explicit timeline application.
 
 Exit:
 
 - a representative Diablo IV source yields reviewable event suggestions without
   retaining sampled frames or uploading media;
+- changing the extraction offsets updates every suggestion without rerunning
+  analysis and applies only after explicit selection;
 - false positives remain suggestions and never mutate the project automatically;
 - cancellation, application exit, timeout and decode failure terminate cleanly.
 

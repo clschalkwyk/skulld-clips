@@ -21,5 +21,6 @@ FR-014,Optional YouTube project performance,OAuth/query/parser/link persistence 
 SEC-003,YouTube credential isolation,OS credential store; no token/frontend HTTP; bounded response tests
 PRIV-002,YouTube data minimization,No media/path/caption/token persistence; disconnect clear; diagnostic exclusion audit
 FR-015,Local Diablo IV clip discovery,Deterministic classifier/grouping tests; configured-source scan; candidate review/apply acceptance
+FR-016,Configurable moment extraction window,Point/interval anchor unit tests; offset validation/clamping; live range and explicit apply acceptance
 SEC-004,Fixed clip-analysis process boundary,Fixed FFmpeg arguments; authorized source; bounded events; no frontend thresholds or raw frames
 PRIV-003,Local analysis data minimization,No upload; no retained sampled frames; no media/path/frame diagnostics

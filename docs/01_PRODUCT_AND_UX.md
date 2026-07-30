@@ -155,10 +155,14 @@ for:
   enemy health bars near the top HUD.
 
 The panel shows progress and supports cancellation. Results include event time,
-suggested clip range, confidence and safe evidence labels. The user can review
-the source frame before choosing **Use suggested range**. Detection never
-silently changes the timeline, and empty/error/cancelled states preserve the
-current edit.
+suggested clip range, confidence and safe evidence labels. **Before moment** and
+**After moment** controls default to 15 seconds and 5 seconds, accept values from
+0 to 300 seconds, and update every suggestion immediately without rerunning
+analysis. For a boss encounter the offsets surround the full detected boss
+interval; for completion and death they surround the detected event time. The
+user can review the source frame before choosing **Use suggested range**.
+Detection never silently changes the timeline, and empty/error/cancelled states
+preserve the current edit.
 
 ## Preview/crop interaction
 

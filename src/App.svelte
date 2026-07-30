@@ -26,6 +26,7 @@
   import {
     clipAnalysisIsActive,
     createClipAnalysisState,
+    DEFAULT_MOMENT_EXTRACTION_WINDOW,
     reduceClipAnalysisEvent,
     type ClipAnalysisState,
   } from "./services/clip-analysis-state";
@@ -118,6 +119,12 @@
   let performanceOpen = $state(false);
   let clipDiscoveryOpen = $state(false);
   let clipAnalysisState = $state<ClipAnalysisState>(createClipAnalysisState());
+  let momentExtractStartTimeSeconds = $state(
+    DEFAULT_MOMENT_EXTRACTION_WINDOW.momentExtractStartTimeMs / 1_000,
+  );
+  let momentExtractEndTimeSeconds = $state(
+    DEFAULT_MOMENT_EXTRACTION_WINDOW.momentExtractEndTimeMs / 1_000,
+  );
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
@@ -1604,7 +1611,10 @@
       <ClipDiscoveryPanel
         sourceFilename={session.project.source.filename}
         sourceUrl={previewUrl}
+        sourceDurationMs={session.project.source.probe.durationMs}
         analysisState={clipAnalysisState}
+        bind:momentExtractStartTimeSeconds
+        bind:momentExtractEndTimeSeconds
         onStart={startCurrentClipAnalysis}
         onCancel={cancelCurrentClipAnalysis}
         onApply={applyClipCandidate}

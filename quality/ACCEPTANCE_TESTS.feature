@@ -162,3 +162,13 @@ Feature: Build a branded vertical gameplay clip
     When I use its suggested range
     Then the validated in and out points are applied and autosaved
     And sampled frames are not retained or uploaded
+
+  Scenario: Configure the moment extraction window
+    Given clip discovery returned a death moment and a boss interval
+    Then the extraction window defaults to 15 seconds before and 5 seconds after
+    When I set Before moment to 20 seconds and After moment to 8 seconds
+    Then every suggested range updates immediately without rerunning clip discovery
+    And the death suggestion surrounds its detected event time
+    And the boss suggestion surrounds its full detected interval
+    And the suggested range is clamped to the source bounds
+    And no project timing changes until I choose Use suggested range

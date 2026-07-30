@@ -56,7 +56,10 @@ Pure Rust classifiers inspect fixed normalized HUD regions for completion/title,
 player-death and persistent wide boss-health-bar signatures. Adjacent positive
 frames are grouped into timestamped candidates, short transients are rejected,
 and at most 50 review suggestions are returned. Confidence is heuristic, not a
-claim of semantic certainty.
+claim of semantic certainty. Each result retains the raw detected point or boss
+interval. The default suggestion adds 15 seconds before and 5 seconds after
+those anchors. Svelte may apply a validated 0–300 second before/after window to
+the anchors without decoding the source again.
 
 Analysis runs as one cancellable native job with structured progress. Timeout,
 decode failure, cancellation and application exit terminate FFmpeg and leave the

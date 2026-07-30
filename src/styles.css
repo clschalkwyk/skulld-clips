@@ -2503,6 +2503,92 @@ kbd {
   margin: 5px 0 0;
 }
 
+.analysis-extraction-window {
+  padding: 18px 28px 20px;
+  border-bottom: 1px solid #302e34;
+  background: #101013;
+}
+
+.analysis-extraction-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.analysis-extraction-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.analysis-extraction-heading > span {
+  color: #77716b;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.analysis-extraction-fields {
+  max-width: 560px;
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysis-extraction-fields label {
+  display: grid;
+  gap: 7px;
+  color: #a49d94;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.analysis-number-input {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid #423d43;
+  background: #0a0a0c;
+}
+
+.analysis-number-input:focus-within {
+  border-color: #ff6a47;
+  box-shadow: 0 0 0 1px #ff6a47;
+}
+
+.analysis-number-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 10px 12px;
+  color: #f3eee8;
+  font: 700 15px/1 ui-monospace, monospace;
+  background: transparent;
+  outline: 0;
+}
+
+.analysis-number-input small {
+  padding-right: 12px;
+  color: #77716b;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.analysis-extraction-window > p {
+  margin: 10px 0 0;
+  color: #89827b;
+  font-size: 11px;
+}
+
+.analysis-extraction-window > .field-error {
+  color: #ff967c;
+}
+
 .analysis-progress,
 .analysis-message {
   margin: 28px;
@@ -2803,10 +2889,15 @@ kbd {
   }
 
   .analysis-intro,
+  .analysis-extraction-heading,
   .analysis-results-heading,
   .analysis-candidate-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .analysis-extraction-fields {
+    grid-template-columns: 1fr;
   }
 
   .performance-backdrop,

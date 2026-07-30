@@ -16,6 +16,8 @@ pub struct ClipCandidate {
     pub id: String,
     pub kind: ClipEventKind,
     pub event_ms: u64,
+    pub detected_start_ms: u64,
+    pub detected_end_ms: u64,
     pub suggested_in_ms: u64,
     pub suggested_out_ms: u64,
     pub confidence: f64,

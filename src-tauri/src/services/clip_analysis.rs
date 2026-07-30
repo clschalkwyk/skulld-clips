@@ -32,6 +32,8 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const PROCESS_EXIT_TIMEOUT: Duration = Duration::from_secs(5);
 const ANALYSIS_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const MAX_CANDIDATES: usize = 50;
+const DEFAULT_MOMENT_EXTRACT_START_MS: u64 = 15_000;
+const DEFAULT_MOMENT_EXTRACT_END_MS: u64 = 5_000;
 
 #[derive(Clone, Default)]
 pub struct ClipAnalysisRegistry {
@@ -680,38 +682,63 @@ fn candidate_from_group(
     let confidence = clamp_score(maximum_score * 0.7 + average_score * 0.3);
     let first_ms = group.first().expect("candidate groups are never empty").0;
     let last_ms = group.last().expect("candidate groups are never empty").0;
-    let (suggested_in_ms, suggested_out_ms, evidence) = match kind {
+    let (detected_start_ms, detected_end_ms, evidence) = match kind {
         ClipEventKind::Completion => (
-            event_ms.saturating_sub(20_000),
-            event_ms.saturating_add(5_000).min(duration_ms),
+            event_ms,
+            event_ms,
             vec![
                 "Large centered title treatment".to_owned(),
                 "Bright emblem and gold UI signature".to_owned(),
             ],
         ),
         ClipEventKind::Death => (
-            event_ms.saturating_sub(15_000),
-            event_ms.saturating_add(5_000).min(duration_ms),
+            event_ms,
+            event_ms,
             vec![
                 "Wide pale title over red death treatment".to_owned(),
                 "Darkened gameplay field".to_owned(),
             ],
         ),
         ClipEventKind::BossEncounter => (
-            first_ms.saturating_sub(5_000),
-            last_ms.saturating_add(5_000).min(duration_ms),
+            first_ms,
+            last_ms,
             vec!["Persistent wide red health bar near the top HUD".to_owned()],
         ),
     };
+    let (suggested_in_ms, suggested_out_ms) = extraction_bounds(
+        detected_start_ms,
+        detected_end_ms,
+        duration_ms,
+        DEFAULT_MOMENT_EXTRACT_START_MS,
+        DEFAULT_MOMENT_EXTRACT_END_MS,
+    );
     ClipCandidate {
         id: Uuid::new_v4().to_string(),
         kind,
         event_ms,
+        detected_start_ms,
+        detected_end_ms,
         suggested_in_ms,
-        suggested_out_ms: suggested_out_ms.max(suggested_in_ms.saturating_add(250)),
+        suggested_out_ms,
         confidence,
         evidence,
     }
+}
+
+fn extraction_bounds(
+    detected_start_ms: u64,
+    detected_end_ms: u64,
+    duration_ms: u64,
+    before_ms: u64,
+    after_ms: u64,
+) -> (u64, u64) {
+    let mut start_ms = detected_start_ms.saturating_sub(before_ms);
+    let mut end_ms = detected_end_ms.saturating_add(after_ms).min(duration_ms);
+    if end_ms.saturating_sub(start_ms) < 250 {
+        end_ms = start_ms.saturating_add(250).min(duration_ms);
+        start_ms = start_ms.min(end_ms.saturating_sub(250));
+    }
+    (start_ms, end_ms)
 }
 
 fn frame_difference(current: &[u8], previous: &[u8]) -> f64 {
@@ -756,8 +783,9 @@ fn clamp_score(score: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        analyze_frame, build_candidates, prepare_clip_analysis, run_clip_analysis_inner,
-        sampler_args, ClipEventKind, FrameObservation, FRAME_BYTES, SAMPLE_HEIGHT, SAMPLE_WIDTH,
+        analyze_frame, build_candidates, extraction_bounds, prepare_clip_analysis,
+        run_clip_analysis_inner, sampler_args, ClipEventKind, FrameObservation, FRAME_BYTES,
+        SAMPLE_HEIGHT, SAMPLE_WIDTH,
     };
     use std::{
         env,
@@ -829,9 +857,24 @@ mod tests {
         let candidates = build_candidates(&observations, 40_000);
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].kind, ClipEventKind::Completion);
+        assert_eq!(candidates[0].detected_start_ms, 10_500);
+        assert_eq!(candidates[0].detected_end_ms, 10_500);
         assert_eq!(candidates[0].suggested_in_ms, 0);
+        assert_eq!(candidates[0].suggested_out_ms, 15_500);
         assert_eq!(candidates[1].kind, ClipEventKind::BossEncounter);
-        assert!(candidates[1].suggested_out_ms <= 40_000);
+        assert_eq!(candidates[1].detected_start_ms, 30_000);
+        assert_eq!(candidates[1].detected_end_ms, 31_500);
+        assert_eq!(candidates[1].suggested_in_ms, 15_000);
+        assert_eq!(candidates[1].suggested_out_ms, 36_500);
+    }
+
+    #[test]
+    fn extraction_bounds_keep_source_edge_ranges_valid() {
+        assert_eq!(extraction_bounds(0, 0, 5_000, 250, 0), (0, 250));
+        assert_eq!(
+            extraction_bounds(5_000, 5_000, 5_000, 0, 250),
+            (4_750, 5_000)
+        );
     }
 
     #[test]

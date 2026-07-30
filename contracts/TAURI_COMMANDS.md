@@ -297,8 +297,11 @@ Only after termination and cleanup attempt.
 
 ### `clip-analysis://completed`
 
-Returns at most 50 `ClipCandidate` records with kind, event time, suggested
-range, confidence and bounded evidence labels.
+Returns at most 50 `ClipCandidate` records with kind, event time, raw detected
+start/end anchors, a default suggested range, confidence and bounded evidence
+labels. Point events use the same detected start/end time; boss encounters retain
+their grouped detection interval. Svelte may recalculate the suggested range from
+those anchors when the user changes the extraction offsets; no rescan is required.
 
 ### `clip-analysis://failed`
 

@@ -57,6 +57,10 @@ Run Svelte against a mock Tauri adapter for fast workflow tests:
 - fixed frame-sampler arguments;
 - completion/death/boss region classifier fixtures;
 - persistence grouping, confidence and suggested-range bounds;
+- point/interval extraction anchors, default 15s/5s offsets, custom offsets and
+  source-bound clamping;
+- rejection of negative, non-numeric, over-five-minute and sub-250ms extraction
+  windows;
 - analysis reservation, cancellation, timeout and sanitized process failures.
 
 ## Rust media integration tests
@@ -124,6 +128,8 @@ For fixture projects:
 - oversized recording analysis timeout;
 - app close and user cancellation during frame sampling;
 - transient red HUD elements that must not become boss candidates.
+- invalid or source-edge extraction windows that must not apply a zero-length
+  timeline range.
 
 ## CI gates
 
@@ -149,4 +155,5 @@ Release candidate:
 - configured-channel OAuth, exact-link, analytics refresh, disconnect-clear and
   packaged Windows/macOS credential-store smoke when YouTube is enabled.
 - configured Diablo IV source scan on Windows and macOS with reviewed
-  completion/death/boss reference moments and no retained raw frames.
+  completion/death/boss reference moments, live extraction-window recalculation
+  and no retained raw frames.

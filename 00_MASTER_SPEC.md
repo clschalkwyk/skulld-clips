@@ -517,6 +517,8 @@ MVP is complete when a user can, fully offline:
   and persistent wide boss-health-bar encounters;
 - timestamped review-first suggestions with confidence, cancellable progress and
   explicit trim application;
+- configurable moment extraction offsets, defaulting to 15 seconds before and
+  5 seconds after the detected moment or detected boss interval;
 - fixed Rust/FFmpeg frame sampling with no cloud inference or automatic project
   mutation.
 

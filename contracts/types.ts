@@ -53,6 +53,8 @@ export interface ClipCandidate {
   id: UUID;
   kind: ClipEventKind;
   eventMs: Milliseconds;
+  detectedStartMs: Milliseconds;
+  detectedEndMs: Milliseconds;
   suggestedInMs: Milliseconds;
   suggestedOutMs: Milliseconds;
   confidence: number;
