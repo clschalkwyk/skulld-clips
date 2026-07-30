@@ -15,6 +15,8 @@
 - YouTube post brief seeding, machine-name rejection, validation, title
   uniqueness/limits, primary-phrase placement, description limits and hashtag
   bounds.
+- typed AI provider status/key/model/generation commands and stable provider
+  authentication/API errors.
 
 ## Component tests
 
@@ -30,6 +32,9 @@
 - clip-discovery idle, progress, cancelled, empty, error, review and apply states.
 - YouTube post empty, invalid brief, generated, edited, SEO-check, copy success
   and clipboard-unavailable states.
+- Local/OpenAI/OpenRouter source switching, masked key entry, saved/removed
+  status, model loading/empty/error states, generation progress and local
+  fallback.
 
 ## Browser-harness E2E
 
@@ -42,6 +47,8 @@ Run Svelte against a mock Tauri adapter for fast workflow tests:
 - recent projects.
 - editor → YouTube post → generate → choose title → edit → copy without a
   connected channel.
+- editor → YouTube post → save provider key → load model → generate → switch
+  provider/local, using a mock native adapter with no real key.
 
 ## Rust unit tests
 
@@ -61,6 +68,10 @@ Run Svelte against a mock Tauri adapter for fast workflow tests:
 - returned-header analytics metric mapping;
 - oversized API response rejection;
 - versioned YouTube catalog bounds and atomic persistence.
+- AI API-key shape validation and per-provider credential entry selection;
+- OpenAI/OpenRouter text-model catalog filtering and bounded response parsing;
+- provider structured-output parsing, title/description/hashtag normalization
+  and sanitized authentication/rate-limit/provider failures;
 - fixed frame-sampler arguments;
 - completion/death/boss region classifier fixtures;
 - persistence grouping, confidence and suggested-range bounds;
@@ -131,6 +142,10 @@ For fixture projects:
 - wrong-channel video;
 - YouTube 401/403/429/5xx and malformed/oversized responses;
 - newly published video with no report rows.
+- invalid/revoked OpenAI and OpenRouter keys;
+- empty/incompatible AI model catalogs;
+- AI provider 400/401/403/429/5xx, timeout and malformed/oversized responses;
+- locked credential store during AI key save/load/remove;
 - source decode failure during analysis;
 - oversized recording analysis timeout;
 - app close and user cancellation during frame sampling;
@@ -161,6 +176,8 @@ Release candidate:
 - signing checks if public.
 - configured-channel OAuth, exact-link, analytics refresh, disconnect-clear and
   packaged Windows/macOS credential-store smoke when YouTube is enabled.
+- user-authorized save/list/generate/remove packaged smoke for OpenAI and
+  OpenRouter, with keys/prompts/responses excluded from captured artifacts.
 - configured Diablo IV source scan on Windows and macOS with reviewed
   completion/death/boss reference moments, live extraction-window recalculation
   and no retained raw frames.

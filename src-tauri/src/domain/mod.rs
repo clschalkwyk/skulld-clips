@@ -1,3 +1,4 @@
+mod ai_post;
 mod clip_analysis;
 mod error;
 mod export;
@@ -6,6 +7,12 @@ mod project;
 mod runtime;
 mod youtube;
 
+pub use ai_post::{
+    AiModelOption, AiPostProvider, AiProviderCredentialStatus, AiYouTubePostBrief,
+    AiYouTubePostDraft, AiYouTubeTitleOption,
+};
+#[cfg(test)]
+pub use ai_post::{AiYouTubePostFormat, AiYouTubePostMomentType};
 pub use clip_analysis::{
     CancelClipAnalysisResponse, ClipAnalysisCancelledEvent, ClipAnalysisCompletedEvent,
     ClipAnalysisFailedEvent, ClipAnalysisProgressEvent, ClipCandidate, ClipEventKind,

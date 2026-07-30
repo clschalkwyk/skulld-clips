@@ -46,3 +46,4 @@ SCF-070,M7,Opt-in YouTube project performance,5.0,"SCF-055,SCF-063","Read-only O
 SCF-071,M8,Local Diablo IV clip discovery,5.0,"SCF-050,SCF-063","Cancellable fixed frame sampling, completion/death/boss candidates, explicit review and trim application"
 SCF-072,M8,Configurable moment extraction window,0.75,SCF-071,"Validated before/after controls default to 15s/5s and recalculate candidate ranges without rescanning"
 SCF-073,M9,Local YouTube post generator,3.0,"SCF-063,SCF-071","Content-aware editable title/description options, platform limits, SEO checks and clipboard handoff without upload"
+SCF-074,M10,AI provider YouTube post generation,4.0,SCF-073,"OpenAI/OpenRouter key isolation, live model lists, bounded brief-only generation and local fallback"

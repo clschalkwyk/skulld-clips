@@ -4,6 +4,9 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type { AppError, RuntimeInfo } from "../contracts/runtime";
 import type {
+  AiModelOption,
+  AiPostProvider,
+  AiProviderCredentialStatus,
   AppErrorCode,
   AssetRef,
   ClipAnalysisEvent,
@@ -19,6 +22,8 @@ import type {
   SaveProjectResult,
   StingAssetRef,
   YouTubeConnectionStatus,
+  YouTubePostBrief,
+  YouTubePostDraft,
   YouTubeProjectPerformance,
   YouTubeVideoCandidate,
 } from "../../contracts/types";
@@ -77,6 +82,8 @@ const APP_ERROR_CODES: ReadonlySet<AppErrorCode> = new Set([
   "E_AUTH_REQUIRED",
   "E_NETWORK",
   "E_YOUTUBE_API",
+  "E_AI_PROVIDER_AUTH",
+  "E_AI_PROVIDER_API",
   "E_IO",
   "E_INTERNAL",
 ]);
@@ -336,6 +343,63 @@ export function revealInFolder(
   invokeCommand: InvokeFn = invoke,
 ): Promise<RevealResponse> {
   return invokeNative("reveal_in_folder", { path }, invokeCommand);
+}
+
+export function getAiProviderCredentialStatuses(
+  invokeCommand: InvokeFn = invoke,
+): Promise<AiProviderCredentialStatus[]> {
+  return invokeNative(
+    "get_ai_provider_credential_statuses",
+    undefined,
+    invokeCommand,
+  );
+}
+
+export function saveAiProviderApiKey(
+  provider: AiPostProvider,
+  apiKey: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<AiProviderCredentialStatus> {
+  return invokeNative(
+    "save_ai_provider_api_key",
+    { provider, apiKey },
+    invokeCommand,
+  );
+}
+
+export function clearAiProviderApiKey(
+  provider: AiPostProvider,
+  invokeCommand: InvokeFn = invoke,
+): Promise<AiProviderCredentialStatus> {
+  return invokeNative(
+    "clear_ai_provider_api_key",
+    { provider },
+    invokeCommand,
+  );
+}
+
+export function listAiProviderModels(
+  provider: AiPostProvider,
+  invokeCommand: InvokeFn = invoke,
+): Promise<AiModelOption[]> {
+  return invokeNative(
+    "list_ai_provider_models",
+    { provider },
+    invokeCommand,
+  );
+}
+
+export function generateAiYouTubePost(
+  provider: AiPostProvider,
+  model: string,
+  brief: YouTubePostBrief,
+  invokeCommand: InvokeFn = invoke,
+): Promise<YouTubePostDraft> {
+  return invokeNative(
+    "generate_ai_youtube_post",
+    { provider, model, brief },
+    invokeCommand,
+  );
 }
 
 export function getYouTubeConnectionStatus(

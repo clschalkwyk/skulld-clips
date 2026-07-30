@@ -45,6 +45,10 @@ pub enum AppErrorCode {
     Network,
     #[serde(rename = "E_YOUTUBE_API")]
     YouTubeApi,
+    #[serde(rename = "E_AI_PROVIDER_AUTH")]
+    AiProviderAuth,
+    #[serde(rename = "E_AI_PROVIDER_API")]
+    AiProviderApi,
     #[serde(rename = "E_IO")]
     Io,
     #[serde(rename = "E_INTERNAL")]
@@ -249,6 +253,28 @@ impl AppError {
         }
     }
 
+    pub fn ai_provider_auth(provider: &str, safe_detail: impl Into<String>) -> Self {
+        Self {
+            code: AppErrorCode::AiProviderAuth,
+            message: format!("Save a valid {provider} API key to continue."),
+            safe_detail: Some(safe_detail.into()),
+            retryable: false,
+        }
+    }
+
+    pub fn ai_provider_api(
+        provider: &str,
+        safe_detail: impl Into<String>,
+        retryable: bool,
+    ) -> Self {
+        Self {
+            code: AppErrorCode::AiProviderApi,
+            message: format!("{provider} could not generate YouTube copy."),
+            safe_detail: Some(safe_detail.into()),
+            retryable,
+        }
+    }
+
     pub fn media_tool_failed(tool: &str, safe_detail: impl Into<String>) -> Self {
         let code = match tool {
             "ffprobe" => AppErrorCode::FfprobeFailed,
@@ -304,6 +330,8 @@ mod tests {
             (AppErrorCode::AuthRequired, "\"E_AUTH_REQUIRED\""),
             (AppErrorCode::Network, "\"E_NETWORK\""),
             (AppErrorCode::YouTubeApi, "\"E_YOUTUBE_API\""),
+            (AppErrorCode::AiProviderAuth, "\"E_AI_PROVIDER_AUTH\""),
+            (AppErrorCode::AiProviderApi, "\"E_AI_PROVIDER_API\""),
             (AppErrorCode::Io, "\"E_IO\""),
             (AppErrorCode::Internal, "\"E_INTERNAL\""),
         ];

@@ -11,6 +11,7 @@ Assets:
 - filesystem permissions;
 - update trust.
 - optional YouTube credentials and owner analytics.
+- optional OpenAI/OpenRouter API keys and creator-reviewed publishing briefs.
 
 | Threat | Control |
 |---|---|
@@ -27,6 +28,8 @@ Assets:
 | OAuth interception/CSRF | System browser; loopback IP; PKCE; random state; fixed timeout |
 | Credential disclosure | Refresh token in OS credential store; access token in memory; no frontend token |
 | API abuse/data exfiltration | Fixed read-only scopes/endpoints/queries; response bounds; no media upload |
+| AI key disclosure | Separate OS credential-store entry per provider; masked transient input; saved keys never returned or logged |
+| Prompt/media exfiltration | Fixed OpenAI/OpenRouter endpoints; bounded factual brief only; no media, transcript, project file, path or YouTube credential |
 
 ## Privacy
 
@@ -47,6 +50,20 @@ The post-MVP YouTube performance workspace is an explicit exception:
 - diagnostic bundles and logs exclude all OAuth, channel, video and performance
   data;
 - an unconfigured or disconnected build preserves the fully offline core.
+
+The optional AI publishing-copy mode is a separate explicit exception:
+
+- the user chooses Local, OpenAI or OpenRouter for each workspace session;
+- saving validates the entered provider key before storing it in an independent
+  OS credential-store entry;
+- Rust owns fixed model-list, key-validation and generation endpoints with a
+  30-second timeout and two-MiB response cap;
+- only the bounded creator-reviewed content brief is sent to the chosen provider;
+- no raw media, transcript, project JSON, private path, YouTube token or
+  performance data is included;
+- provider responses and errors are sanitized before reaching the frontend or
+  logs;
+- Local generation, the core editor and export remain fully offline.
 
 ## Process controls
 
@@ -94,6 +111,9 @@ For internal development, a locally installed FFmpeg is acceptable. A random bun
 
 Configured YouTube release candidates additionally require a real
 user-authorized Windows/macOS browser-callback and credential-store smoke.
+AI-provider release candidates require user-authorized save/list/generate/remove
+smokes for both providers without recording keys, prompts or provider responses
+in artifacts or diagnostics.
 
 ## Release manifest
 
@@ -110,6 +130,8 @@ Record:
 - signing identity reference;
 - project schema version.
 - whether YouTube OAuth is configured, without recording the client ID.
+- whether AI provider support is compiled, without recording key state or model
+  selection.
 
 ## Logs
 

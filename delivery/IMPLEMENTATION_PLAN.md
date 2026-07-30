@@ -189,6 +189,31 @@ Exit:
 - closing and reopening the workspace during the same project session preserves
   the current brief and edited draft.
 
+## Milestone 10 — Optional AI publishing-copy providers (4h)
+
+Deliver:
+
+- Local, OpenAI and OpenRouter generation-source selection;
+- independent masked provider-key entry, validation, saved status and removal;
+- OS credential-store isolation with no saved key returned to Svelte;
+- bounded live text-model catalogs for the chosen provider;
+- OpenAI Responses and OpenRouter Chat Completions structured-output requests
+  through Rust-owned fixed endpoints;
+- creator-reviewed brief-only disclosure, sanitized errors, editable output and
+  unchanged local fallback.
+
+Exit:
+
+- a valid key can load that provider's available text models and generate three
+  bounded titles plus one bounded description;
+- invalid/revoked keys, empty catalogs, rate limits, malformed/oversized
+  responses and unsupported models have actionable non-secret states;
+- switching provider never reuses another provider's key, and removing a key
+  clears only that provider's credential;
+- raw media, transcripts, project files, private paths, YouTube credentials,
+  keys and unbounded provider output never enter requests, logs or diagnostics;
+- Local generation and the offline editor/export remain available.
+
 ## Weekend cut (12–16h)
 
 Include only:

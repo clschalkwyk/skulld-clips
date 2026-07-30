@@ -97,9 +97,17 @@ Thin adapters that:
 
 ### YouTube post generator
 
-- pure TypeScript with no Tauri command or network request;
-- consumes project name, first caption, applied moment kind and creator-edited
-  metadata only;
+- pure TypeScript local mode consumes project name, first caption, applied
+  moment kind and creator-edited metadata only;
+- optional OpenAI/OpenRouter mode uses typed commands through
+  `src/services/tauri.ts`; Rust owns API keys, fixed provider endpoints, bearer
+  headers, timeouts, two-MiB response bounds and schema-constrained generation;
+- provider model catalogs are fetched by Rust and returned as bounded typed
+  options; model IDs cannot alter the fixed endpoint or request body shape;
+- per-provider keys are validated before storage and remain in the
+  operating-system credential store; the frontend receives only configured
+  status and never reads a saved key;
+- remote requests contain only the bounded creator-reviewed content brief;
 - never claims to inspect, transcribe or semantically understand raw media;
 - enforces YouTube title/description limits and bounded hashtag output;
 - stores the working brief and editable output only in the current Svelte
@@ -116,6 +124,9 @@ Thin adapters that:
 - later edits do not mutate the active job.
 - YouTube operations are serialized outside the UI thread;
 - performance refresh never blocks local edit/save/export operations.
+- AI provider key validation, model discovery and generation run outside the UI
+  thread and do not block local edit/save/export; one panel action is submitted
+  at a time.
 - clip analysis is single-job, cancellable and independent from the immutable
   export registry;
 - application exit waits for active export and analysis samplers to terminate.

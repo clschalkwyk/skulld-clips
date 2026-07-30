@@ -216,13 +216,43 @@ constructs one fixed FFmpeg frame-sampling command. The frontend cannot supply a
 profile, executable, frame filter, threshold or raw argument. One analysis runs
 at a time; results are suggestions and do not mutate the project.
 
-## Local YouTube post generation
+## YouTube post generation
 
-YouTube publishing copy requires no native command. A pure TypeScript service
-combines the current project name, first hook caption, explicitly applied moment
-kind and creator-edited content brief. It generates bounded editable title and
-description suggestions locally. It does not decode media, transcribe audio,
-call a text-generation API, connect a channel or publish content.
+The deterministic local publishing-copy mode requires no native command. A pure
+TypeScript service combines the current project name, first hook caption,
+explicitly applied moment kind and creator-edited content brief.
+
+Optional OpenAI and OpenRouter modes use only these fixed native commands:
+
+```ts
+get_ai_provider_credential_statuses(): AiProviderCredentialStatus[]
+save_ai_provider_api_key({
+  provider: "openai" | "openrouter";
+  apiKey: string;
+}): AiProviderCredentialStatus
+clear_ai_provider_api_key({
+  provider: "openai" | "openrouter";
+}): AiProviderCredentialStatus
+list_ai_provider_models({
+  provider: "openai" | "openrouter";
+}): AiModelOption[]
+generate_ai_youtube_post({
+  provider: "openai" | "openrouter";
+  model: string;
+  brief: YouTubePostBrief;
+}): YouTubePostDraft
+```
+
+Rust owns the fixed provider endpoints, bearer authentication, response bounds,
+timeouts, schema-constrained request, output validation and OS credential-store
+entries. Saving validates a key before replacement. Status responses expose only
+`configured: boolean`; keys are never returned. Model IDs must come from the
+selected provider's catalog and cannot change the endpoint or request shape.
+
+Remote generation sends only the bounded factual brief. It does not send source
+media, a transcript, project files, private paths, YouTube OAuth data or generic
+frontend HTTP requests. It does not connect a channel or publish content. Local
+mode remains available without a key or network connection.
 
 ## Optional YouTube performance
 

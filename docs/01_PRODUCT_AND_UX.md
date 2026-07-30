@@ -166,6 +166,22 @@ Copy-title, copy-description and copy-full-post actions hand the final edited
 text to the system clipboard. Draft state remains in memory for the current
 project session and is not written into the project file.
 
+**Generation source** offers Local template, OpenAI API and OpenRouter API. Local
+remains the default offline path. Each remote provider has an independent masked
+API-key field, saved/not-saved status, remove action, refreshable live model list
+and model picker. The raw key is never redisplayed after saving.
+
+Saving a key validates it before writing it to the operating-system credential
+store. Until that succeeds, the provider's model picker and generation action
+remain unavailable. Loading, empty-model, invalid-key, rate-limit, provider
+failure and successful generation states are explicit and preserve the current
+brief and editable draft.
+
+Before remote generation the workspace states that only the factual content
+brief is sent to the chosen provider. It never implies that the model saw the
+video, and it never sends media, the project file, private paths or YouTube
+credentials. Switching back to Local requires no network or account.
+
 ### Find clip moments
 
 The Editor exposes a separate **Find moments** workspace for the current source.

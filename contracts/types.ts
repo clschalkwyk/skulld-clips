@@ -102,6 +102,21 @@ export interface YouTubePostChecks {
   hashtagCount: number;
 }
 
+export type AiPostProvider = "openai" | "openrouter";
+export type YouTubePostGenerationSource = "local" | AiPostProvider;
+
+export interface AiProviderCredentialStatus {
+  provider: AiPostProvider;
+  configured: boolean;
+}
+
+export interface AiModelOption {
+  provider: AiPostProvider;
+  id: string;
+  name: string;
+  contextLength: number | null;
+}
+
 export type ClipAnalysisEvent =
   | {
       event: "clip-analysis://progress";
@@ -285,6 +300,8 @@ export type AppErrorCode =
   | "E_AUTH_REQUIRED"
   | "E_NETWORK"
   | "E_YOUTUBE_API"
+  | "E_AI_PROVIDER_AUTH"
+  | "E_AI_PROVIDER_API"
   | "E_IO"
   | "E_INTERNAL";
 

@@ -186,3 +186,23 @@ Feature: Build a branded vertical gameplay clip
     And the description contains no more than three relevant hashtags
     And I can copy the title, description or combined post
     And no YouTube connection, network request or project mutation is required
+
+  Scenario Outline: Generate YouTube publishing copy with an AI provider
+    Given I opened a project with a creator-confirmed factual content brief
+    When I choose "<provider>" as the generation source
+    And I enter and save a valid "<provider>" API key
+    Then the key is validated and stored in the operating-system credential store
+    And the saved key is not returned to or redisplayed by the frontend
+    And I can choose from the current compatible "<provider>" model list
+    When I generate the post with that model
+    Then only the bounded factual content brief is sent to "<provider>"
+    And I receive three editable titles within 100 characters
+    And the description stays within 5000 characters and three hashtags
+    And the primary search phrase appears in the selected title and opening description
+    And the source media, project file, private paths and YouTube credentials are not sent
+    And I can switch back to Local generation without a network connection
+
+    Examples:
+      | provider   |
+      | OpenAI     |
+      | OpenRouter |

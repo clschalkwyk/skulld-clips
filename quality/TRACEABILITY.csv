@@ -23,6 +23,9 @@ PRIV-002,YouTube data minimization,No media/path/caption/token persistence; disc
 FR-015,Local Diablo IV clip discovery,Deterministic classifier/grouping tests; configured-source scan; candidate review/apply acceptance
 FR-016,Configurable moment extraction window,Point/interval anchor unit tests; offset validation/clamping; live range and explicit apply acceptance
 FR-017,Local YouTube post generation,Brief seeding/validation and bounded generator unit tests; packaged generate/edit/copy smoke
+FR-018,Optional AI YouTube post generation,Typed provider commands; OpenAI/OpenRouter model filtering; structured-output normalization; packaged provider switch/model/generate smoke
 SEC-004,Fixed clip-analysis process boundary,Fixed FFmpeg arguments; authorized source; bounded events; no frontend thresholds or raw frames
+SEC-005,AI provider credential and endpoint isolation,Per-provider OS credential entries; fixed Rust endpoints; saved keys never returned; bounded sanitized responses
 PRIV-004,Local publishing-copy generation,No raw media/transcript/network/account/project persistence; creator-confirmed content acceptance
+PRIV-005,AI publishing-copy data minimization,Creator-reviewed bounded brief only; no media/transcript/project/path/YouTube credential in requests/logs/diagnostics
 PRIV-003,Local analysis data minimization,No upload; no retained sampled frames; no media/path/frame diagnostics

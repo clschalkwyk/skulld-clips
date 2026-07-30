@@ -69,3 +69,23 @@ Consulted 2026-07-30.
   https://support.google.com/youtube/answer/6390658
 - Official discovery guidance for accurate, non-sensational titles:
   https://support.google.com/youtube/answer/141805
+
+## AI publishing-copy providers
+
+Consulted 2026-07-30.
+
+- OpenAI model catalog and current text-capable model guidance:
+  https://developers.openai.com/api/docs/models
+- OpenAI `GET /v1/models` API:
+  https://developers.openai.com/api/reference/resources/models/methods/list
+- OpenAI Responses API:
+  https://developers.openai.com/api/reference/resources/responses/methods/create
+- OpenAI Structured Outputs with `text.format`:
+  https://developers.openai.com/api/docs/guides/structured-outputs
+- OpenRouter model catalog API:
+  https://openrouter.ai/docs/api/api-reference/models/get-models
+- OpenRouter current-key validation:
+  https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key
+- OpenRouter Chat Completions and structured outputs:
+  https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request
+  https://openrouter.ai/docs/guides/features/structured-outputs

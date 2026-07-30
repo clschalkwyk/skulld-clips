@@ -427,6 +427,15 @@ Commands remain thin. Domain validation and FFmpeg construction must be pure and
 | `E_EXPORT_ACTIVE` | Existing active job |
 | `E_EXPORT_NOT_FOUND` | Unknown job |
 | `E_EXPORT_CANCELLED` | User cancelled |
+| `E_ANALYSIS_ACTIVE` | Existing clip-analysis job |
+| `E_ANALYSIS_NOT_FOUND` | Unknown clip-analysis job |
+| `E_ANALYSIS_FAILED` | Clip analysis failed |
+| `E_INTEGRATION_UNAVAILABLE` | Optional integration is not configured |
+| `E_AUTH_REQUIRED` | YouTube authorization is required |
+| `E_NETWORK` | YouTube network request failed |
+| `E_YOUTUBE_API` | YouTube API rejected or could not satisfy the request |
+| `E_AI_PROVIDER_AUTH` | OpenAI/OpenRouter API key is missing or rejected |
+| `E_AI_PROVIDER_API` | AI provider catalog or generation request failed |
 | `E_IO` | Filesystem error |
 | `E_INTERNAL` | Unclassified internal error |
 
@@ -522,8 +531,13 @@ MVP is complete when a user can, fully offline:
 - local YouTube title/description generation from the current project, applied
   detected moment, hook caption and a creator-confirmed content brief;
 - three editable title angles, one editable description, bounded platform
-  limits and at most three relevant hashtags, with no upload or cloud-AI
-  dependency;
+  limits and at most three relevant hashtags;
+- optional OpenAI or OpenRouter generation using a creator-selected live model
+  catalog, with the deterministic local generator retained as the offline
+  fallback;
+- per-provider API keys validated through fixed endpoints and stored only in the
+  operating-system credential store; remote generation sends the bounded factual
+  content brief, never media, project files, private paths or YouTube credentials;
 - fixed Rust/FFmpeg frame sampling with no cloud inference or automatic project
   mutation.
 

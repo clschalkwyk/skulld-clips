@@ -18,6 +18,7 @@ pub fn run() {
         .manage(security::path_policy::PathPolicy::default())
         .manage(services::export::ExportRegistry::default())
         .manage(services::clip_analysis::ClipAnalysisRegistry::default())
+        .manage(services::ai_post::AiPostService)
         .setup(|app| {
             use tauri::Manager;
 
@@ -54,6 +55,11 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::ai_post::get_ai_provider_credential_statuses,
+            commands::ai_post::save_ai_provider_api_key,
+            commands::ai_post::clear_ai_provider_api_key,
+            commands::ai_post::list_ai_provider_models,
+            commands::ai_post::generate_ai_youtube_post,
             commands::assets::select_overlay_file,
             commands::assets::select_sting_file,
             commands::assets::import_overlay_asset,

@@ -2,7 +2,12 @@
   import { onMount } from "svelte";
 
   import type {
+    AiModelOption,
+    AiPostProvider,
+    AiProviderCredentialStatus,
+    AppError,
     ClipEventKind,
+    YouTubePostGenerationSource,
     YouTubePostBrief,
     YouTubePostDraft,
     YouTubePostMomentType,
@@ -15,6 +20,13 @@
     YOUTUBE_DESCRIPTION_LIMIT,
     YOUTUBE_TITLE_LIMIT,
   } from "../../services/youtube-post-generator";
+  import {
+    clearAiProviderApiKey,
+    generateAiYouTubePost,
+    getAiProviderCredentialStatuses,
+    listAiProviderModels,
+    saveAiProviderApiKey,
+  } from "../../services/tauri";
 
   interface Props {
     projectName: string;
@@ -39,8 +51,45 @@
   let closeButton = $state<HTMLButtonElement>();
   let copyStatus = $state<string | null>(null);
   let copyError = $state<string | null>(null);
+  let generationSource = $state<YouTubePostGenerationSource>("local");
+  let credentialStatuses = $state<AiProviderCredentialStatus[]>([]);
+  let modelsByProvider = $state<Record<AiPostProvider, AiModelOption[]>>({
+    openai: [],
+    openrouter: [],
+  });
+  let selectedModels = $state<Record<AiPostProvider, string>>({
+    openai: "",
+    openrouter: "",
+  });
+  let apiKeyInput = $state("");
+  let providerLoading = $state(false);
+  let generationLoading = $state(false);
+  let providerError = $state<AppError | null>(null);
+  let providerNotice = $state<string | null>(null);
   let errors = $derived(validateYouTubePostBrief(brief));
-  let canGenerate = $derived(Object.keys(errors).length === 0);
+  let selectedProvider = $derived(
+    generationSource === "local" ? null : generationSource,
+  );
+  let selectedCredentialStatus = $derived(
+    selectedProvider
+      ? (credentialStatuses.find(
+          (status) => status.provider === selectedProvider,
+        ) ?? null)
+      : null,
+  );
+  let selectedProviderModels = $derived(
+    selectedProvider ? modelsByProvider[selectedProvider] : [],
+  );
+  let selectedModel = $derived(
+    selectedProvider ? selectedModels[selectedProvider] : "",
+  );
+  let canGenerate = $derived(
+    Object.keys(errors).length === 0 &&
+      !generationLoading &&
+      (generationSource === "local" ||
+        (Boolean(selectedCredentialStatus?.configured) &&
+          selectedModel.length > 0)),
+  );
   let checks = $derived(
     draft
       ? analyzeYouTubePost(
@@ -53,15 +102,181 @@
 
   onMount(() => {
     closeButton?.focus();
+    void loadCredentialStatuses();
   });
 
-  function generate(): void {
+  async function generate(): Promise<void> {
     if (!canGenerate) {
       return;
     }
-    draft = generateYouTubePost(brief);
+    providerError = null;
+    generationLoading = true;
+    try {
+      draft =
+        generationSource === "local"
+          ? generateYouTubePost(brief)
+          : await generateAiYouTubePost(
+              generationSource,
+              selectedModels[generationSource],
+              brief,
+            );
+    } catch (error) {
+      providerError = error as AppError;
+    } finally {
+      generationLoading = false;
+    }
     copyStatus = null;
     copyError = null;
+  }
+
+  async function loadCredentialStatuses(): Promise<void> {
+    providerLoading = true;
+    providerError = null;
+    try {
+      credentialStatuses = await getAiProviderCredentialStatuses();
+    } catch (error) {
+      providerError = error as AppError;
+    } finally {
+      providerLoading = false;
+    }
+  }
+
+  async function handleSourceChange(): Promise<void> {
+    apiKeyInput = "";
+    providerError = null;
+    providerNotice = null;
+    if (
+      generationSource !== "local" &&
+      credentialStatuses.find(
+        (status) => status.provider === generationSource,
+      )?.configured &&
+      modelsByProvider[generationSource].length === 0
+    ) {
+      await loadModels(generationSource);
+    }
+  }
+
+  async function saveApiKey(): Promise<void> {
+    if (!selectedProvider || apiKeyInput.length < 20) {
+      return;
+    }
+    providerLoading = true;
+    providerError = null;
+    providerNotice = null;
+    try {
+      const status = await saveAiProviderApiKey(
+        selectedProvider,
+        apiKeyInput,
+      );
+      updateCredentialStatus(status);
+      apiKeyInput = "";
+      const modelsLoaded = await loadModels(selectedProvider, false);
+      if (modelsLoaded) {
+        providerNotice = `${providerLabel(selectedProvider)} key saved securely and model list loaded.`;
+      }
+    } catch (error) {
+      providerError = error as AppError;
+    } finally {
+      providerLoading = false;
+    }
+  }
+
+  async function clearApiKey(): Promise<void> {
+    if (!selectedProvider) {
+      return;
+    }
+    providerLoading = true;
+    providerError = null;
+    providerNotice = null;
+    try {
+      const status = await clearAiProviderApiKey(selectedProvider);
+      updateCredentialStatus(status);
+      modelsByProvider = {
+        ...modelsByProvider,
+        [selectedProvider]: [],
+      };
+      selectedModels = {
+        ...selectedModels,
+        [selectedProvider]: "",
+      };
+      providerNotice = `${providerLabel(selectedProvider)} key removed from the credential store.`;
+    } catch (error) {
+      providerError = error as AppError;
+    } finally {
+      providerLoading = false;
+    }
+  }
+
+  async function loadModels(
+    provider: AiPostProvider,
+    ownLoadingState = true,
+  ): Promise<boolean> {
+    if (ownLoadingState) {
+      providerLoading = true;
+      providerError = null;
+      providerNotice = null;
+    }
+    try {
+      const models = await listAiProviderModels(provider);
+      modelsByProvider = {
+        ...modelsByProvider,
+        [provider]: models,
+      };
+      const currentSelection = selectedModels[provider];
+      selectedModels = {
+        ...selectedModels,
+        [provider]: models.some((model) => model.id === currentSelection)
+          ? currentSelection
+          : (models[0]?.id ?? ""),
+      };
+      if (models.length === 0) {
+        providerNotice = `${providerLabel(provider)} returned no compatible text-generation models.`;
+      }
+      return models.length > 0;
+    } catch (error) {
+      providerError = error as AppError;
+      return false;
+    } finally {
+      if (ownLoadingState) {
+        providerLoading = false;
+      }
+    }
+  }
+
+  function updateCredentialStatus(
+    nextStatus: AiProviderCredentialStatus,
+  ): void {
+    credentialStatuses = [
+      ...credentialStatuses.filter(
+        (status) => status.provider !== nextStatus.provider,
+      ),
+      nextStatus,
+    ];
+  }
+
+  function selectModel(event: Event): void {
+    if (!selectedProvider) {
+      return;
+    }
+    selectedModels = {
+      ...selectedModels,
+      [selectedProvider]: (event.currentTarget as HTMLSelectElement).value,
+    };
+  }
+
+  function providerLabel(provider: AiPostProvider): string {
+    return provider === "openai" ? "OpenAI" : "OpenRouter";
+  }
+
+  function providerKeyPlaceholder(provider: AiPostProvider): string {
+    return provider === "openai" ? "sk-…" : "sk-or-v1-…";
+  }
+
+  function formatContextLength(contextLength: number | null): string {
+    if (!contextLength) {
+      return "";
+    }
+    return ` · ${Intl.NumberFormat("en", { notation: "compact" }).format(contextLength)} context`;
   }
 
   function useSuggestedSearchPhrase(): void {
@@ -171,7 +386,11 @@
             <p class="section-label">Content brief</p>
             <h3 id="post-brief-heading">Tell viewers what actually happens</h3>
           </div>
-          <span>Local generation · no upload</span>
+          <span>
+            {generationSource === "local"
+              ? "Local generation · no upload"
+              : `${providerLabel(generationSource)} · brief only`}
+          </span>
         </div>
 
         <p class="post-explainer">
@@ -179,6 +398,144 @@
           caption. Correct the details before generating—SEO copy should describe
           the real video, not invent it.
         </p>
+
+        <div class="post-provider-panel" aria-labelledby="post-provider-heading">
+          <div class="post-provider-heading">
+            <div>
+              <p class="section-label">Generation engine</p>
+              <h4 id="post-provider-heading">Choose where the copy is written</h4>
+            </div>
+            {#if selectedProvider}
+              <span
+                class="post-provider-status"
+                class:configured={selectedCredentialStatus?.configured}
+              >
+                {selectedCredentialStatus?.configured
+                  ? "Key saved"
+                  : "Key required"}
+              </span>
+            {/if}
+          </div>
+
+          <label>
+            <span>Generation source</span>
+            <select
+              bind:value={generationSource}
+              onchange={() => void handleSourceChange()}
+              disabled={providerLoading || generationLoading}
+            >
+              <option value="local">Local template</option>
+              <option value="openai">OpenAI API</option>
+              <option value="openrouter">OpenRouter API</option>
+            </select>
+          </label>
+
+          {#if selectedProvider}
+            <p class="post-provider-disclosure">
+              Only this factual content brief is sent to
+              {providerLabel(selectedProvider)}. Clip Forge never sends the source
+              video, project file, private paths, or YouTube credentials.
+            </p>
+
+            <div class="post-provider-key-row">
+              <label>
+                <span>{providerLabel(selectedProvider)} API key</span>
+                <input
+                  type="password"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder={providerKeyPlaceholder(selectedProvider)}
+                  bind:value={apiKeyInput}
+                  disabled={providerLoading || generationLoading}
+                />
+                <small>
+                  Saving validates the key, then stores it in the operating-system
+                  credential store.
+                </small>
+              </label>
+              <button
+                class="secondary-button"
+                type="button"
+                onclick={() => void saveApiKey()}
+                disabled={providerLoading ||
+                  generationLoading ||
+                  apiKeyInput.length < 20}
+              >
+                {providerLoading ? "Checking…" : "Save key"}
+              </button>
+            </div>
+
+            {#if selectedCredentialStatus?.configured}
+              <div class="post-provider-model-row">
+                <label>
+                  <span>{providerLabel(selectedProvider)} model</span>
+                  <select
+                    value={selectedModel}
+                    onchange={selectModel}
+                    disabled={providerLoading ||
+                      generationLoading ||
+                      selectedProviderModels.length === 0}
+                  >
+                    {#if selectedProviderModels.length === 0}
+                      <option value="">No models loaded</option>
+                    {:else}
+                      {#each selectedProviderModels as model (model.id)}
+                        <option value={model.id}>
+                          {model.name}{formatContextLength(model.contextLength)}
+                        </option>
+                      {/each}
+                    {/if}
+                  </select>
+                  <small>
+                    The list comes from the provider and reflects models available
+                    to this key.
+                  </small>
+                </label>
+                <div class="post-provider-actions">
+                  <button
+                    class="secondary-button"
+                    type="button"
+                    onclick={() => void loadModels(selectedProvider)}
+                    disabled={providerLoading || generationLoading}
+                  >
+                    Refresh models
+                  </button>
+                  <button
+                    class="text-button"
+                    type="button"
+                    onclick={() => void clearApiKey()}
+                    disabled={providerLoading || generationLoading}
+                  >
+                    Remove saved key
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            {#if providerNotice}
+              <p class="post-provider-notice" role="status">{providerNotice}</p>
+            {/if}
+            {#if providerError}
+              <div class="post-provider-error" role="alert">
+                <strong>{providerError.message}</strong>
+                {#if providerError.safeDetail}
+                  <span>{providerError.safeDetail}</span>
+                {/if}
+                <code>{providerError.code}</code>
+              </div>
+            {/if}
+          {/if}
+        </div>
+
+        {#if generationSource === "local" && providerError}
+          <div class="post-provider-error" role="alert">
+            <strong>{providerError.message}</strong>
+            {#if providerError.safeDetail}
+              <span>{providerError.safeDetail}</span>
+            {/if}
+            <code>{providerError.code}</code>
+          </div>
+        {/if}
 
         <div class="post-form-grid">
           <label>
@@ -288,9 +645,22 @@
             onclick={generate}
             disabled={!canGenerate}
           >
-            {draft ? "Regenerate post" : "Generate title + description"}
+            {#if generationLoading}
+              Generating with {selectedProvider
+                ? providerLabel(selectedProvider)
+                : "local template"}…
+            {:else if draft}
+              Regenerate post
+            {:else}
+              Generate title + description
+            {/if}
           </button>
-          <span>{sourceFilename}</span>
+          <span>
+            {sourceFilename} ·
+            {generationSource === "local"
+              ? "offline"
+              : `${providerLabel(generationSource)} model`}
+          </span>
         </div>
       </section>
 
@@ -413,7 +783,9 @@
 
     <footer class="post-footer">
       <span>Titles: 100 characters maximum</span>
-      <span>Descriptions: 5,000 characters maximum · 3 relevant hashtags</span>
+      <span>
+        Keys: OS credential store · descriptions: 5,000 maximum · 3 hashtags
+      </span>
     </footer>
   </div>
 </div>

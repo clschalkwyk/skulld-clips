@@ -4,17 +4,22 @@ import type { RuntimeInfo } from "../contracts/runtime";
 import {
   cancelClipAnalysis,
   cancelExport,
+  clearAiProviderApiKey,
   createDiagnosticBundle,
   createProject,
+  generateAiYouTubePost,
+  getAiProviderCredentialStatuses,
   getRuntimeInfo,
   importOverlayAsset,
   importStingAsset,
   linkProjectToYouTubeVideo,
+  listAiProviderModels,
   listYouTubePerformance,
   loadProject,
   normalizeAppError,
   projectAssetPath,
   revealInFolder,
+  saveAiProviderApiKey,
   saveProject,
   selectExportDestination,
   selectDiagnosticDestination,
@@ -25,7 +30,11 @@ import {
   writeCaptionAsset,
   type InvokeFn,
 } from "./tauri";
-import type { ExportRequest, ProjectV1 } from "../../contracts/types";
+import type {
+  ExportRequest,
+  ProjectV1,
+  YouTubePostBrief,
+} from "../../contracts/types";
 
 const runtimeInfo: RuntimeInfo = {
   appVersion: "0.1.0",
@@ -92,6 +101,63 @@ describe("getRuntimeInfo", () => {
       3,
       "sync_youtube_performance",
       { projectId: "85b793a2-ac42-48f1-9f0e-b6fb57496388" },
+    );
+  });
+
+  it("keeps AI provider credentials and generation behind typed native commands", async () => {
+    const invokeCommand = vi.fn(async () => ({})) as InvokeFn;
+    const brief = {
+      game: "Diablo IV",
+      format: "short",
+      momentType: "bossEncounter",
+      contentSummary: "The Butcher ambushed the player before the final hit.",
+      primarySearchPhrase: "Diablo 4 Butcher fight",
+      supportingKeywords: "Whirlwind Barbarian",
+      callToAction: "Subscribe for more boss fights.",
+    } satisfies YouTubePostBrief;
+
+    await getAiProviderCredentialStatuses(invokeCommand);
+    await saveAiProviderApiKey("openai", "sk-test-key", invokeCommand);
+    await listAiProviderModels("openai", invokeCommand);
+    await generateAiYouTubePost(
+      "openai",
+      "gpt-5.6-terra",
+      brief,
+      invokeCommand,
+    );
+    await clearAiProviderApiKey("openai", invokeCommand);
+
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      1,
+      "get_ai_provider_credential_statuses",
+      undefined,
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      2,
+      "save_ai_provider_api_key",
+      {
+        provider: "openai",
+        apiKey: "sk-test-key",
+      },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      3,
+      "list_ai_provider_models",
+      { provider: "openai" },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      4,
+      "generate_ai_youtube_post",
+      {
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        brief,
+      },
+    );
+    expect(invokeCommand).toHaveBeenNthCalledWith(
+      5,
+      "clear_ai_provider_api_key",
+      { provider: "openai" },
     );
   });
 });

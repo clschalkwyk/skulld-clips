@@ -1,3 +1,4 @@
+pub mod ai_post;
 pub mod assets;
 pub mod clip_analysis;
 pub mod diagnostics;
