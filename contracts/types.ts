@@ -61,6 +61,47 @@ export interface ClipCandidate {
   evidence: string[];
 }
 
+export type YouTubePostFormat = "short" | "video";
+
+export type YouTubePostMomentType =
+  | ClipEventKind
+  | "buildShowcase"
+  | "gameplayHighlight"
+  | "guide";
+
+export interface YouTubePostBrief {
+  game: string;
+  format: YouTubePostFormat;
+  momentType: YouTubePostMomentType;
+  contentSummary: string;
+  primarySearchPhrase: string;
+  supportingKeywords: string;
+  callToAction: string;
+}
+
+export interface YouTubeTitleOption {
+  id: "searchFirst" | "hookFirst" | "momentFirst";
+  label: string;
+  title: string;
+}
+
+export interface YouTubePostDraft {
+  titleOptions: YouTubeTitleOption[];
+  title: string;
+  description: string;
+  hashtags: string[];
+}
+
+export interface YouTubePostChecks {
+  titleCharacters: number;
+  descriptionCharacters: number;
+  titleWithinLimit: boolean;
+  descriptionWithinLimit: boolean;
+  searchPhraseInTitle: boolean;
+  searchPhraseInOpeningDescription: boolean;
+  hashtagCount: number;
+}
+
 export type ClipAnalysisEvent =
   | {
       event: "clip-analysis://progress";

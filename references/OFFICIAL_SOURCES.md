@@ -41,7 +41,7 @@ Exact dependency versions and sidecar checksums must be pinned in the implementa
 
 ## YouTube and Google OAuth
 
-Consulted 2026-07-29.
+Consulted 2026-07-30.
 
 - Desktop OAuth 2.0, PKCE and loopback redirects:
   https://developers.google.com/identity/protocols/oauth2/native-app
@@ -61,3 +61,11 @@ Consulted 2026-07-29.
   https://developers.google.com/youtube/v3/docs/playlistItems/list
 - Data API quota and project setup:
   https://developers.google.com/youtube/v3/getting-started
+- YouTube title and description character limits:
+  https://support.google.com/youtube/answer/57407
+- Official description guidance on unique copy and 1–2 primary search terms:
+  https://support.google.com/youtube/answer/12948449
+- Hashtag behavior and anti-over-tagging policy:
+  https://support.google.com/youtube/answer/6390658
+- Official discovery guidance for accurate, non-sensational titles:
+  https://support.google.com/youtube/answer/141805

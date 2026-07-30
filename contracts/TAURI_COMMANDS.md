@@ -216,6 +216,14 @@ constructs one fixed FFmpeg frame-sampling command. The frontend cannot supply a
 profile, executable, frame filter, threshold or raw argument. One analysis runs
 at a time; results are suggestions and do not mutate the project.
 
+## Local YouTube post generation
+
+YouTube publishing copy requires no native command. A pure TypeScript service
+combines the current project name, first hook caption, explicitly applied moment
+kind and creator-edited content brief. It generates bounded editable title and
+description suggestions locally. It does not decode media, transcribe audio,
+call a text-generation API, connect a channel or publish content.
+
 ## Optional YouTube performance
 
 These commands exist only for the read-only post-MVP performance workspace.

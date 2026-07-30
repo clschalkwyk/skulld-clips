@@ -20,6 +20,8 @@ Owns:
 - caption rasterization;
 - typed command invocation;
 - event consumption.
+- pure local YouTube publishing-copy generation from creator-confirmed project
+  context.
 
 Does not own:
 
@@ -92,6 +94,16 @@ Thin adapters that:
 - connected-channel and video ownership validation;
 - versioned atomic app-local link/snapshot persistence;
 - no media upload, publishing action or frontend HTTP capability.
+
+### YouTube post generator
+
+- pure TypeScript with no Tauri command or network request;
+- consumes project name, first caption, applied moment kind and creator-edited
+  metadata only;
+- never claims to inspect, transcribe or semantically understand raw media;
+- enforces YouTube title/description limits and bounded hashtag output;
+- stores the working brief and editable output only in the current Svelte
+  session.
 
 ## Concurrency
 

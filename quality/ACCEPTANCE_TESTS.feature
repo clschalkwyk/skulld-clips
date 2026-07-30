@@ -172,3 +172,17 @@ Feature: Build a branded vertical gameplay clip
     And the boss suggestion surrounds its full detected interval
     And the suggested range is clamped to the source bounds
     And no project timing changes until I choose Use suggested range
+
+  Scenario: Generate YouTube publishing copy locally
+    Given I opened a project with a hook caption and an applied boss moment
+    When I open YouTube post
+    Then the brief is seeded from that caption, boss moment and current project
+    And the app explains that it has not transcribed or uploaded the source
+    When I confirm what happens and enter the primary viewer search phrase
+    And I generate the post
+    Then I receive three distinct editable title options within 100 characters
+    And the editable description stays within 5000 characters
+    And the primary search phrase appears in the title and opening description
+    And the description contains no more than three relevant hashtags
+    And I can copy the title, description or combined post
+    And no YouTube connection, network request or project mutation is required

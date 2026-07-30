@@ -12,6 +12,9 @@
 - error mapping.
 - typed YouTube command names/payloads and stable integration errors.
 - clip-analysis command names, event reducer and candidate application bounds.
+- YouTube post brief seeding, machine-name rejection, validation, title
+  uniqueness/limits, primary-phrase placement, description limits and hashtag
+  bounds.
 
 ## Component tests
 
@@ -25,6 +28,8 @@
 - relink flow.
 - YouTube unavailable, disconnected, linking, pending, error and scorecard states.
 - clip-discovery idle, progress, cancelled, empty, error, review and apply states.
+- YouTube post empty, invalid brief, generated, edited, SEO-check, copy success
+  and clipboard-unavailable states.
 
 ## Browser-harness E2E
 
@@ -35,6 +40,8 @@ Run Svelte against a mock Tauri adapter for fast workflow tests:
 - export UI;
 - errors;
 - recent projects.
+- editor → YouTube post → generate → choose title → edit → copy without a
+  connected channel.
 
 ## Rust unit tests
 

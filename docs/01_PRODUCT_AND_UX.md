@@ -142,6 +142,30 @@ The user always confirms the exact project/video link. The UI does not imply
 that matching titles or filenames proves provenance. Scorecards identify the
 last requested complete date and state that YouTube data may be delayed.
 
+### YouTube post generator
+
+The Editor exposes a separate **YouTube post** workspace before publishing. It
+does not require a connected channel and does not upload or publish the video.
+
+The generator seeds a content brief from safe local context:
+
+- current project name when it is descriptive rather than machine-generated;
+- the first hook caption already present in the project;
+- the completion, death or boss moment explicitly applied from clip discovery;
+- the current YouTube Shorts/video format.
+
+The creator must review the game, moment type, factual one-line summary, primary
+search phrase, optional supporting keywords and call to action. Empty or
+machine-generated filenames are never treated as content claims.
+
+The output provides three distinct editable title angles and one editable
+description. Every title is capped at 100 characters, the description at 5,000
+characters, the primary search phrase appears in the title and opening
+description, and no more than three directly relevant hashtags are generated.
+Copy-title, copy-description and copy-full-post actions hand the final edited
+text to the system clipboard. Draft state remains in memory for the current
+project session and is not written into the project file.
+
 ### Find clip moments
 
 The Editor exposes a separate **Find moments** workspace for the current source.

@@ -11,6 +11,8 @@
     NormalizedRect,
     Overlay,
     RecentProject,
+    YouTubePostBrief,
+    YouTubePostDraft,
   } from "../contracts/types";
   import ClipDiscoveryPanel from "./components/analysis/ClipDiscoveryPanel.svelte";
   import CropInspector from "./components/editor/CropInspector.svelte";
@@ -20,6 +22,7 @@
   import Timeline from "./components/editor/Timeline.svelte";
   import ExportPanel from "./components/export/ExportPanel.svelte";
   import PerformancePanel from "./components/performance/PerformancePanel.svelte";
+  import YouTubePostGeneratorPanel from "./components/publishing/YouTubePostGeneratorPanel.svelte";
   import type { RuntimeInfo } from "./contracts/runtime";
   import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
   import { renderCaption } from "./services/caption-renderer";
@@ -88,6 +91,7 @@
     setTrimIn,
     setTrimOut,
   } from "./services/timeline";
+  import { createDefaultYouTubePostBrief } from "./services/youtube-post-generator";
 
   type BusyAction = "importing" | "opening" | "relinking" | null;
   type SaveState = "saved" | "unsaved" | "saving" | "error";
@@ -117,6 +121,10 @@
   let diagnosticPath = $state<string | null>(null);
   let diagnosticError = $state<string | null>(null);
   let performanceOpen = $state(false);
+  let youtubePostOpen = $state(false);
+  let youtubePostBrief = $state<YouTubePostBrief | null>(null);
+  let youtubePostDraft = $state<YouTubePostDraft | null>(null);
+  let appliedMomentKind = $state<ClipCandidate["kind"] | null>(null);
   let clipDiscoveryOpen = $state(false);
   let clipAnalysisState = $state<ClipAnalysisState>(createClipAnalysisState());
   let momentExtractStartTimeSeconds = $state(
@@ -299,6 +307,10 @@
     diagnosticPath = null;
     diagnosticError = null;
     performanceOpen = false;
+    youtubePostOpen = false;
+    youtubePostBrief = null;
+    youtubePostDraft = null;
+    appliedMomentKind = null;
     clipDiscoveryOpen = false;
     clipAnalysisState = createClipAnalysisState();
     autosave = createAutosaveScheduler(persistProject);
@@ -333,6 +345,30 @@
 
   function closePerformance(): void {
     performanceOpen = false;
+  }
+
+  function openYouTubePost(): void {
+    if (!session) {
+      return;
+    }
+    if (!youtubePostBrief) {
+      const captionText =
+        session.project.overlays.find((overlay) => overlay.type === "caption")
+          ?.caption.text ?? null;
+      youtubePostBrief = createDefaultYouTubePostBrief({
+        projectName: session.project.name,
+        sourceFilename: session.project.source.filename,
+        captionText,
+        detectedMomentKind: appliedMomentKind,
+        exportPreset: session.project.exportDefaults.presetId,
+      });
+    }
+    playing = false;
+    youtubePostOpen = true;
+  }
+
+  function closeYouTubePost(): void {
+    youtubePostOpen = false;
   }
 
   function openClipDiscovery(): void {
@@ -430,6 +466,11 @@
     );
     playing = false;
     clipDiscoveryOpen = false;
+    appliedMomentKind = candidate.kind;
+    if (youtubePostBrief) {
+      youtubePostBrief.momentType = candidate.kind;
+      youtubePostDraft = null;
+    }
     markProjectDirty();
   }
 
@@ -1242,6 +1283,10 @@
       saveState = "saved";
       clipDiscoveryOpen = false;
       clipAnalysisState = createClipAnalysisState();
+      youtubePostOpen = false;
+      youtubePostBrief = null;
+      youtubePostDraft = null;
+      appliedMomentKind = null;
       await refreshRecents();
     } catch (error) {
       const normalized = normalizeAppError(error);
@@ -1303,6 +1348,13 @@
   }
 
   function handleShortcut(event: KeyboardEvent): void {
+    if (youtubePostOpen) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeYouTubePost();
+      }
+      return;
+    }
     if (performanceOpen) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -1417,6 +1469,13 @@
           : clipAnalysisState.candidates.length > 0
             ? `Moments (${clipAnalysisState.candidates.length})`
             : "Find moments"}
+      </button>
+      <button
+        class="secondary-button compact-button"
+        type="button"
+        onclick={openYouTubePost}
+      >
+        YouTube post
       </button>
       <button
         class="secondary-button compact-button"
@@ -1619,6 +1678,19 @@
         onCancel={cancelCurrentClipAnalysis}
         onApply={applyClipCandidate}
         onClose={closeClipDiscovery}
+      />
+    {/if}
+
+    {#if youtubePostOpen && youtubePostBrief}
+      <YouTubePostGeneratorPanel
+        projectName={session.project.name}
+        sourceFilename={session.project.source.filename}
+        trimDurationMs={session.project.timeline.outMs -
+          session.project.timeline.inMs}
+        detectedMomentKind={appliedMomentKind}
+        bind:brief={youtubePostBrief}
+        bind:draft={youtubePostDraft}
+        onClose={closeYouTubePost}
       />
     {/if}
   </main>

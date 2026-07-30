@@ -519,6 +519,11 @@ MVP is complete when a user can, fully offline:
   explicit trim application;
 - configurable moment extraction offsets, defaulting to 15 seconds before and
   5 seconds after the detected moment or detected boss interval;
+- local YouTube title/description generation from the current project, applied
+  detected moment, hook caption and a creator-confirmed content brief;
+- three editable title angles, one editable description, bounded platform
+  limits and at most three relevant hashtags, with no upload or cloud-AI
+  dependency;
 - fixed Rust/FFmpeg frame sampling with no cloud inference or automatic project
   mutation.
 
