@@ -144,6 +144,24 @@ Exit:
 - disconnect clears credentials and cached account/performance data;
 - the core editor/export continues to pass offline acceptance.
 
+## Milestone 8 — Local Diablo IV clip discovery (5h)
+
+Deliver:
+
+- fixed low-resolution FFmpeg frame sampling behind the Rust path boundary;
+- cancellable single-job progress and sanitized terminal events;
+- deterministic completion/title, player-death and persistent wide boss-bar
+  classifiers;
+- bounded candidate grouping with confidence and suggested ranges;
+- in-panel source review and explicit timeline application.
+
+Exit:
+
+- a representative Diablo IV source yields reviewable event suggestions without
+  retaining sampled frames or uploading media;
+- false positives remain suggestions and never mutate the project automatically;
+- cancellation, application exit, timeout and decode failure terminate cleanly.
+
 ## Weekend cut (12–16h)
 
 Include only:

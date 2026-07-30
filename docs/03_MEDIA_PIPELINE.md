@@ -45,6 +45,24 @@ Normalized output includes:
 - audio properties;
 - warnings.
 
+## Local clip discovery
+
+The Diablo IV discovery profile samples the authorized source through a fixed
+Rust-owned FFmpeg argument vector. It decodes two 320×180 RGB frames per second
+to a bounded streaming reader; it does not write frames to the project, retain
+media after analysis or expose raw FFmpeg inputs to Svelte.
+
+Pure Rust classifiers inspect fixed normalized HUD regions for completion/title,
+player-death and persistent wide boss-health-bar signatures. Adjacent positive
+frames are grouped into timestamped candidates, short transients are rejected,
+and at most 50 review suggestions are returned. Confidence is heuristic, not a
+claim of semantic certainty.
+
+Analysis runs as one cancellable native job with structured progress. Timeout,
+decode failure, cancellation and application exit terminate FFmpeg and leave the
+project unchanged. A candidate modifies the timeline only after explicit user
+selection.
+
 ## Coordinate model
 
 Persist crop relative to display-oriented source:

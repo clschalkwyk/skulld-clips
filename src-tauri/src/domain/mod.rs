@@ -1,3 +1,4 @@
+mod clip_analysis;
 mod error;
 mod export;
 mod media;
@@ -5,6 +6,11 @@ mod project;
 mod runtime;
 mod youtube;
 
+pub use clip_analysis::{
+    CancelClipAnalysisResponse, ClipAnalysisCancelledEvent, ClipAnalysisCompletedEvent,
+    ClipAnalysisFailedEvent, ClipAnalysisProgressEvent, ClipCandidate, ClipEventKind,
+    StartClipAnalysisResponse,
+};
 pub use error::{AppError, AppErrorCode};
 pub use export::{
     CancelExportResponse, ExportCancelledEvent, ExportCompletedEvent, ExportFailedEvent,

@@ -194,6 +194,28 @@ output: {
 }
 ```
 
+## Local clip discovery
+
+```ts
+start_clip_analysis({
+  sourcePath: string;
+}): {
+  jobId: UUID;
+  acceptedAt: string;
+}
+
+cancel_clip_analysis({
+  jobId: UUID;
+}): {
+  accepted: boolean;
+}
+```
+
+Rust revalidates the authorized source, probes its selected video stream and
+constructs one fixed FFmpeg frame-sampling command. The frontend cannot supply a
+profile, executable, frame filter, threshold or raw argument. One analysis runs
+at a time; results are suggestions and do not mutate the project.
+
 ## Optional YouTube performance
 
 These commands exist only for the read-only post-MVP performance workspace.
@@ -260,5 +282,31 @@ Bounded sanitized detail.
 ### `export://cancelled`
 
 Only after termination and cleanup attempt.
+
+### `clip-analysis://progress`
+
+```ts
+{
+  event: "clip-analysis://progress";
+  jobId: UUID;
+  progress: number;
+  analyzedMs: number;
+  totalMs: number;
+}
+```
+
+### `clip-analysis://completed`
+
+Returns at most 50 `ClipCandidate` records with kind, event time, suggested
+range, confidence and bounded evidence labels.
+
+### `clip-analysis://failed`
+
+Returns a stable sanitized `AppError` without media paths, decoded frames or
+FFmpeg output.
+
+### `clip-analysis://cancelled`
+
+Emitted after the frame sampler is terminated. The project remains unchanged.
 
 Frontend listeners must be unregistered on store/window teardown.

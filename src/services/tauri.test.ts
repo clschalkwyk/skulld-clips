@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { RuntimeInfo } from "../contracts/runtime";
 import {
+  cancelClipAnalysis,
   cancelExport,
   createDiagnosticBundle,
   createProject,
@@ -17,6 +18,7 @@ import {
   saveProject,
   selectExportDestination,
   selectDiagnosticDestination,
+  startClipAnalysis,
   startExport,
   syncYouTubePerformance,
   validateExport,
@@ -220,6 +222,20 @@ describe("project commands", () => {
     );
     expect(invokeCommand).toHaveBeenNthCalledWith(7, "reveal_in_folder", {
       path: "/exports/clip.mp4",
+    });
+  });
+
+  it("keeps clip analysis behind fixed typed commands", async () => {
+    const invokeCommand = vi.fn(async () => ({})) as InvokeFn;
+
+    await startClipAnalysis("/clips/source.mp4", invokeCommand);
+    await cancelClipAnalysis("analysis-1", invokeCommand);
+
+    expect(invokeCommand).toHaveBeenNthCalledWith(1, "start_clip_analysis", {
+      sourcePath: "/clips/source.mp4",
+    });
+    expect(invokeCommand).toHaveBeenNthCalledWith(2, "cancel_clip_analysis", {
+      jobId: "analysis-1",
     });
   });
 });

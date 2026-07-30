@@ -147,3 +147,18 @@ Feature: Build a branded vertical gameplay clip
     When I disconnect and confirm clearing data
     Then the OS credential and cached YouTube performance data are removed
     And offline import edit save reopen and export still work
+
+  Scenario: Discover Diablo IV clip moments locally
+    Given I opened a source containing completion, death and boss-health-bar moments
+    When I start clip discovery
+    Then FFmpeg samples the authorized source with the fixed Diablo IV profile
+    And progress is visible and cancellable
+    And completion and death treatments require persistent title-screen evidence
+    And a boss encounter requires a persistent top-HUD health bar wider than normal
+    And every candidate includes an event time, suggested range, confidence and evidence
+    And no candidate changes the project until I choose Use suggested range
+    When I review a candidate
+    Then I can inspect the source at its event time without changing the timeline
+    When I use its suggested range
+    Then the validated in and out points are applied and autosaved
+    And sampled frames are not retained or uploaded

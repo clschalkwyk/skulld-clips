@@ -513,5 +513,11 @@ MVP is complete when a user can, fully offline:
 - explicit Clip Forge project to YouTube video linking;
 - cached per-video scorecards and daily history;
 - no publishing, media upload, telemetry or frontend network capability.
+- local Diablo IV clip discovery for completion/title treatments, player deaths
+  and persistent wide boss-health-bar encounters;
+- timestamped review-first suggestions with confidence, cancellable progress and
+  explicit trim application;
+- fixed Rust/FFmpeg frame sampling with no cloud inference or automatic project
+  mutation.
 
 Do not begin roadmap work until MVP acceptance passes.

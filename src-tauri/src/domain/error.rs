@@ -31,6 +31,12 @@ pub enum AppErrorCode {
     ExportNotFound,
     #[serde(rename = "E_EXPORT_CANCELLED")]
     ExportCancelled,
+    #[serde(rename = "E_ANALYSIS_ACTIVE")]
+    AnalysisActive,
+    #[serde(rename = "E_ANALYSIS_NOT_FOUND")]
+    AnalysisNotFound,
+    #[serde(rename = "E_ANALYSIS_FAILED")]
+    AnalysisFailed,
     #[serde(rename = "E_INTEGRATION_UNAVAILABLE")]
     IntegrationUnavailable,
     #[serde(rename = "E_AUTH_REQUIRED")]
@@ -160,6 +166,35 @@ impl AppError {
         }
     }
 
+    pub fn analysis_active() -> Self {
+        Self {
+            code: AppErrorCode::AnalysisActive,
+            message: "Another clip analysis is already active.".to_owned(),
+            safe_detail: Some(
+                "Wait for it to finish or cancel it before starting another scan.".to_owned(),
+            ),
+            retryable: false,
+        }
+    }
+
+    pub fn analysis_not_found() -> Self {
+        Self {
+            code: AppErrorCode::AnalysisNotFound,
+            message: "The clip analysis job is no longer active.".to_owned(),
+            safe_detail: Some("Start a new source scan before trying again.".to_owned()),
+            retryable: false,
+        }
+    }
+
+    pub fn analysis_failed(safe_detail: impl Into<String>, retryable: bool) -> Self {
+        Self {
+            code: AppErrorCode::AnalysisFailed,
+            message: "Clip Forge could not analyze this gameplay clip.".to_owned(),
+            safe_detail: Some(safe_detail.into()),
+            retryable,
+        }
+    }
+
     pub fn ffmpeg_failed(safe_detail: impl Into<String>) -> Self {
         Self {
             code: AppErrorCode::FfmpegFailed,
@@ -259,6 +294,9 @@ mod tests {
             (AppErrorCode::ExportActive, "\"E_EXPORT_ACTIVE\""),
             (AppErrorCode::ExportNotFound, "\"E_EXPORT_NOT_FOUND\""),
             (AppErrorCode::ExportCancelled, "\"E_EXPORT_CANCELLED\""),
+            (AppErrorCode::AnalysisActive, "\"E_ANALYSIS_ACTIVE\""),
+            (AppErrorCode::AnalysisNotFound, "\"E_ANALYSIS_NOT_FOUND\""),
+            (AppErrorCode::AnalysisFailed, "\"E_ANALYSIS_FAILED\""),
             (
                 AppErrorCode::IntegrationUnavailable,
                 "\"E_INTEGRATION_UNAVAILABLE\"",

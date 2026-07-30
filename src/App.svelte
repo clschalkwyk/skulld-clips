@@ -4,6 +4,7 @@
   import type {
     AppError,
     CaptionStyle,
+    ClipCandidate,
     ExportRequest,
     ExportSettings,
     LoadProjectResult,
@@ -11,6 +12,7 @@
     Overlay,
     RecentProject,
   } from "../contracts/types";
+  import ClipDiscoveryPanel from "./components/analysis/ClipDiscoveryPanel.svelte";
   import CropInspector from "./components/editor/CropInspector.svelte";
   import LayerPanel from "./components/editor/LayerPanel.svelte";
   import OverlayInspector from "./components/editor/OverlayInspector.svelte";
@@ -21,6 +23,12 @@
   import type { RuntimeInfo } from "./contracts/runtime";
   import { createAutosaveScheduler, type AutosaveScheduler } from "./services/autosave";
   import { renderCaption } from "./services/caption-renderer";
+  import {
+    clipAnalysisIsActive,
+    createClipAnalysisState,
+    reduceClipAnalysisEvent,
+    type ClipAnalysisState,
+  } from "./services/clip-analysis-state";
   import {
     createExportState,
     exportIsActive,
@@ -43,6 +51,7 @@
     STING_EXIT_MS,
   } from "./services/overlay-model";
   import {
+    cancelClipAnalysis,
     cancelExport,
     createDiagnosticBundle,
     createProject,
@@ -50,6 +59,7 @@
     importOverlayAsset,
     importStingAsset,
     listRecentProjects,
+    listenForClipAnalysisEvents,
     listenForExportEvents,
     listenForFileDrops,
     loadProject,
@@ -65,6 +75,7 @@
     selectOverlayFile,
     selectStingFile,
     selectProjectFile,
+    startClipAnalysis,
     startExport,
     validateExport,
     writeCaptionAsset,
@@ -105,10 +116,13 @@
   let diagnosticPath = $state<string | null>(null);
   let diagnosticError = $state<string | null>(null);
   let performanceOpen = $state(false);
+  let clipDiscoveryOpen = $state(false);
+  let clipAnalysisState = $state<ClipAnalysisState>(createClipAnalysisState());
 
   let autosave: AutosaveScheduler | null = null;
   let unlistenDrop: (() => void) | null = null;
   let unlistenExport: (() => void) | null = null;
+  let unlistenClipAnalysis: (() => void) | null = null;
   let captionRenderTimer: ReturnType<typeof setTimeout> | null = null;
   let captionRenderPromise: Promise<void> | null = null;
   let captionRenderError: AppError | null = null;
@@ -140,6 +154,7 @@
     return () => {
       unlistenDrop?.();
       unlistenExport?.();
+      unlistenClipAnalysis?.();
       autosave?.dispose();
       if (captionRenderTimer) {
         clearTimeout(captionRenderTimer);
@@ -156,7 +171,7 @@
       runtimeError = normalizeAppError(runtimeResult.reason);
     }
     try {
-      [unlistenDrop, unlistenExport] = await Promise.all([
+      [unlistenDrop, unlistenExport, unlistenClipAnalysis] = await Promise.all([
         listenForFileDrops(
           (paths) => {
             if (!session && paths[0]) {
@@ -169,6 +184,12 @@
         ),
         listenForExportEvents((event) => {
           exportState = reduceExportEvent(exportState, event);
+        }),
+        listenForClipAnalysisEvents((event) => {
+          clipAnalysisState = reduceClipAnalysisEvent(
+            clipAnalysisState,
+            event,
+          );
         }),
       ]);
     } catch (error) {
@@ -271,6 +292,8 @@
     diagnosticPath = null;
     diagnosticError = null;
     performanceOpen = false;
+    clipDiscoveryOpen = false;
+    clipAnalysisState = createClipAnalysisState();
     autosave = createAutosaveScheduler(persistProject);
   }
 
@@ -303,6 +326,104 @@
 
   function closePerformance(): void {
     performanceOpen = false;
+  }
+
+  function openClipDiscovery(): void {
+    if (!session || session.sourceStatus !== "ok") {
+      return;
+    }
+    playing = false;
+    clipDiscoveryOpen = true;
+  }
+
+  function closeClipDiscovery(): void {
+    clipDiscoveryOpen = false;
+  }
+
+  async function startCurrentClipAnalysis(): Promise<void> {
+    if (
+      !session ||
+      session.sourceStatus !== "ok" ||
+      clipAnalysisIsActive(clipAnalysisState)
+    ) {
+      return;
+    }
+    clipAnalysisState = {
+      ...createClipAnalysisState(),
+      status: "starting",
+      totalMs: session.project.source.probe.durationMs,
+    };
+    try {
+      const started = await startClipAnalysis(session.project.source.path);
+      if (
+        clipAnalysisState.status === "starting" &&
+        clipAnalysisState.jobId === null
+      ) {
+        clipAnalysisState = {
+          ...clipAnalysisState,
+          status: "running",
+          jobId: started.jobId,
+        };
+      }
+    } catch (error) {
+      clipAnalysisState = {
+        ...clipAnalysisState,
+        status: "error",
+        error: normalizeAppError(error),
+      };
+    }
+  }
+
+  async function cancelCurrentClipAnalysis(): Promise<void> {
+    const jobId = clipAnalysisState.jobId;
+    if (!jobId || !clipAnalysisIsActive(clipAnalysisState)) {
+      return;
+    }
+    clipAnalysisState = {
+      ...clipAnalysisState,
+      cancelRequested: true,
+    };
+    try {
+      await cancelClipAnalysis(jobId);
+    } catch (error) {
+      clipAnalysisState = {
+        ...clipAnalysisState,
+        status: "error",
+        error: normalizeAppError(error),
+        cancelRequested: false,
+      };
+    }
+  }
+
+  function applyClipCandidate(candidate: ClipCandidate): void {
+    if (!session || clipAnalysisIsActive(clipAnalysisState)) {
+      return;
+    }
+    const durationMs = session.project.source.probe.durationMs;
+    const minimumDuration = session.project.overlays.some(
+      (overlay) => overlay.type === "sting",
+    )
+      ? 500
+      : 250;
+    const inMs = Math.max(
+      0,
+      Math.min(candidate.suggestedInMs, durationMs - minimumDuration),
+    );
+    const outMs = Math.min(
+      durationMs,
+      Math.max(candidate.suggestedOutMs, inMs + minimumDuration),
+    );
+    session.project.timeline.inMs = Math.round(inMs);
+    session.project.timeline.outMs = Math.round(outMs);
+    clampOverlayTimings();
+    playheadMs = clampPlayhead(
+      candidate.eventMs,
+      session.project.timeline.inMs,
+      session.project.timeline.outMs,
+    );
+    playing = false;
+    clipDiscoveryOpen = false;
+    markProjectDirty();
   }
 
   function updateExportSettings(settings: ExportSettings): void {
@@ -1058,6 +1179,10 @@
       exportOpen = true;
       return;
     }
+    if (clipAnalysisIsActive(clipAnalysisState)) {
+      clipDiscoveryOpen = true;
+      return;
+    }
     playing = false;
     await autosave?.flush();
     if (saveState === "error") {
@@ -1108,6 +1233,8 @@
       previewError = null;
       pendingReplacementPath = null;
       saveState = "saved";
+      clipDiscoveryOpen = false;
+      clipAnalysisState = createClipAnalysisState();
       await refreshRecents();
     } catch (error) {
       const normalized = normalizeAppError(error);
@@ -1275,6 +1402,18 @@
       <button
         class="secondary-button compact-button"
         type="button"
+        onclick={openClipDiscovery}
+        disabled={session.sourceStatus !== "ok"}
+      >
+        {clipAnalysisIsActive(clipAnalysisState)
+          ? `Scanning ${Math.round(clipAnalysisState.progress * 100)}%`
+          : clipAnalysisState.candidates.length > 0
+            ? `Moments (${clipAnalysisState.candidates.length})`
+            : "Find moments"}
+      </button>
+      <button
+        class="secondary-button compact-button"
+        type="button"
         onclick={openPerformance}
       >
         Performance
@@ -1283,7 +1422,8 @@
         class="primary-button"
         type="button"
         onclick={openExport}
-        disabled={session.sourceStatus !== "ok"}
+        disabled={session.sourceStatus !== "ok" ||
+          clipAnalysisIsActive(clipAnalysisState)}
         title="Export vertical MP4 (Ctrl/Cmd+E)"
       >
         Export
@@ -1434,7 +1574,7 @@
     </section>
 
     <footer class="editor-footer">
-      <span>Milestone 7 · YouTube performance</span>
+      <span>Milestone 8 · Local clip discovery</span>
       <span>Local project · schema v{session.project.schemaVersion}</span>
     </footer>
 
@@ -1457,6 +1597,18 @@
         onCreateDiagnostic={createExportDiagnostic}
         onReveal={revealExportOutput}
         onClose={closeExport}
+      />
+    {/if}
+
+    {#if clipDiscoveryOpen}
+      <ClipDiscoveryPanel
+        sourceFilename={session.project.source.filename}
+        sourceUrl={previewUrl}
+        analysisState={clipAnalysisState}
+        onStart={startCurrentClipAnalysis}
+        onCancel={cancelCurrentClipAnalysis}
+        onApply={applyClipCandidate}
+        onClose={closeClipDiscovery}
       />
     {/if}
   </main>

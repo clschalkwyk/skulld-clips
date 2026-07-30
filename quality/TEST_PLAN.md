@@ -11,6 +11,7 @@
 - autosave state;
 - error mapping.
 - typed YouTube command names/payloads and stable integration errors.
+- clip-analysis command names, event reducer and candidate application bounds.
 
 ## Component tests
 
@@ -23,6 +24,7 @@
 - cancellation UI;
 - relink flow.
 - YouTube unavailable, disconnected, linking, pending, error and scorecard states.
+- clip-discovery idle, progress, cancelled, empty, error, review and apply states.
 
 ## Browser-harness E2E
 
@@ -52,6 +54,10 @@ Run Svelte against a mock Tauri adapter for fast workflow tests:
 - returned-header analytics metric mapping;
 - oversized API response rejection;
 - versioned YouTube catalog bounds and atomic persistence.
+- fixed frame-sampler arguments;
+- completion/death/boss region classifier fixtures;
+- persistence grouping, confidence and suggested-range bounds;
+- analysis reservation, cancellation, timeout and sanitized process failures.
 
 ## Rust media integration tests
 
@@ -71,6 +77,18 @@ Use pinned FFmpeg/ffprobe fixtures:
 | 250 ms clip | minimum duration |
 
 Fixtures must be generated or redistributable.
+
+Run the opt-in clip-discovery smoke against an authorized local gameplay source:
+
+```sh
+SKCF_RUN_CLIP_ANALYSIS_INTEGRATION=1 \
+SKCF_CLIP_ANALYSIS_SOURCE=/absolute/path/to/gameplay.mp4 \
+cargo test --manifest-path src-tauri/Cargo.toml \
+  services::clip_analysis::tests::analyzes_real_media_source_when_enabled -- --nocapture
+```
+
+The smoke test reports only candidate counts; it does not persist frame bytes or
+print the source path.
 
 ## Golden media tests
 
@@ -102,6 +120,10 @@ For fixture projects:
 - wrong-channel video;
 - YouTube 401/403/429/5xx and malformed/oversized responses;
 - newly published video with no report rows.
+- source decode failure during analysis;
+- oversized recording analysis timeout;
+- app close and user cancellation during frame sampling;
+- transient red HUD elements that must not become boss candidates.
 
 ## CI gates
 
@@ -126,3 +148,5 @@ Release candidate:
 - signing checks if public.
 - configured-channel OAuth, exact-link, analytics refresh, disconnect-clear and
   packaged Windows/macOS credential-store smoke when YouTube is enabled.
+- configured Diablo IV source scan on Windows and macOS with reviewed
+  completion/death/boss reference moments and no retained raw frames.

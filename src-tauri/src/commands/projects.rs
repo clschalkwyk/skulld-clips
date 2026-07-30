@@ -205,8 +205,10 @@ pub async fn load_project(
         migration_applied: false,
     };
     if response.source_status == projects::SourceStatus::Ok {
+        let source_path = paths
+            .authorize_existing_file(PathBuf::from(&response.project.source.path).as_path())?;
         app.asset_protocol_scope()
-            .allow_file(&response.project.source.path)
+            .allow_file(source_path)
             .map_err(|_| AppError::internal("The media preview path could not be authorized."))?;
     }
     for overlay in &response.project.overlays {

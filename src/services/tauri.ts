@@ -6,6 +6,7 @@ import type { AppError, RuntimeInfo } from "../contracts/runtime";
 import type {
   AppErrorCode,
   AssetRef,
+  ClipAnalysisEvent,
   CreateProjectResult,
   ExportEvent,
   ExportRequest,
@@ -28,6 +29,15 @@ export interface StartExportResponse {
 }
 
 export interface CancelExportResponse {
+  accepted: boolean;
+}
+
+export interface StartClipAnalysisResponse {
+  jobId: string;
+  acceptedAt: string;
+}
+
+export interface CancelClipAnalysisResponse {
   accepted: boolean;
 }
 
@@ -60,6 +70,9 @@ const APP_ERROR_CODES: ReadonlySet<AppErrorCode> = new Set([
   "E_EXPORT_ACTIVE",
   "E_EXPORT_NOT_FOUND",
   "E_EXPORT_CANCELLED",
+  "E_ANALYSIS_ACTIVE",
+  "E_ANALYSIS_NOT_FOUND",
+  "E_ANALYSIS_FAILED",
   "E_INTEGRATION_UNAVAILABLE",
   "E_AUTH_REQUIRED",
   "E_NETWORK",
@@ -277,6 +290,24 @@ export function cancelExport(
   return invokeNative("cancel_export", { jobId }, invokeCommand);
 }
 
+export function startClipAnalysis(
+  sourcePath: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<StartClipAnalysisResponse> {
+  return invokeNative(
+    "start_clip_analysis",
+    { sourcePath },
+    invokeCommand,
+  );
+}
+
+export function cancelClipAnalysis(
+  jobId: string,
+  invokeCommand: InvokeFn = invoke,
+): Promise<CancelClipAnalysisResponse> {
+  return invokeNative("cancel_clip_analysis", { jobId }, invokeCommand);
+}
+
 export function selectDiagnosticDestination(
   suggestedName: string,
   invokeCommand: InvokeFn = invoke,
@@ -381,6 +412,27 @@ export async function listenForExportEvents(
   const unlisteners = await Promise.all(
     eventNames.map((eventName) =>
       listen<ExportEvent>(eventName, ({ payload }) => onEvent(payload)),
+    ),
+  );
+  return () => {
+    for (const unlisten of unlisteners) {
+      unlisten();
+    }
+  };
+}
+
+export async function listenForClipAnalysisEvents(
+  onEvent: (event: ClipAnalysisEvent) => void,
+): Promise<UnlistenFn> {
+  const eventNames: ClipAnalysisEvent["event"][] = [
+    "clip-analysis://progress",
+    "clip-analysis://completed",
+    "clip-analysis://failed",
+    "clip-analysis://cancelled",
+  ];
+  const unlisteners = await Promise.all(
+    eventNames.map((eventName) =>
+      listen<ClipAnalysisEvent>(eventName, ({ payload }) => onEvent(payload)),
     ),
   );
   return () => {

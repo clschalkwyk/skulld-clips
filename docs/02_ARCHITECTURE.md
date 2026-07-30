@@ -71,6 +71,17 @@ Thin adapters that:
 - verification;
 - atomic rename.
 
+### Clip analysis service
+
+- one cancellable analysis job outside the UI thread;
+- authorized source and native-selected video stream;
+- fixed FFmpeg sampling arguments at two 320×180 RGB frames per second;
+- streaming frame classification with no retained frame cache;
+- pure Diablo IV HUD/title heuristics and bounded candidate grouping;
+- progress/completed/failed/cancelled events;
+- no frontend thresholds, filter fragments, executable names or automatic
+  project mutation.
+
 ### YouTube performance service
 
 - optional OAuth desktop-client configuration;
@@ -93,6 +104,9 @@ Thin adapters that:
 - later edits do not mutate the active job.
 - YouTube operations are serialized outside the UI thread;
 - performance refresh never blocks local edit/save/export operations.
+- clip analysis is single-job, cancellable and independent from the immutable
+  export registry;
+- application exit waits for active export and analysis samplers to terminate.
 
 ## Process registry
 
@@ -198,7 +212,7 @@ Structured fields:
 - sanitized detail;
 - duration.
 
-Never log full source paths, caption text, media data, OAuth values, channel or
+Never log full source paths, caption text, media or sampled frame data, OAuth values, channel or
 video metadata, performance metrics, or unbounded command/API output.
 
 ## Repository shape

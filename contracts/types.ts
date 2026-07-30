@@ -47,6 +47,41 @@ export interface MediaProbe {
   warnings: string[];
 }
 
+export type ClipEventKind = "completion" | "death" | "bossEncounter";
+
+export interface ClipCandidate {
+  id: UUID;
+  kind: ClipEventKind;
+  eventMs: Milliseconds;
+  suggestedInMs: Milliseconds;
+  suggestedOutMs: Milliseconds;
+  confidence: number;
+  evidence: string[];
+}
+
+export type ClipAnalysisEvent =
+  | {
+      event: "clip-analysis://progress";
+      jobId: UUID;
+      progress: number;
+      analyzedMs: Milliseconds;
+      totalMs: Milliseconds;
+    }
+  | {
+      event: "clip-analysis://completed";
+      jobId: UUID;
+      candidates: ClipCandidate[];
+    }
+  | {
+      event: "clip-analysis://failed";
+      jobId: UUID;
+      error: AppError;
+    }
+  | {
+      event: "clip-analysis://cancelled";
+      jobId: UUID;
+    };
+
 export interface AssetRef {
   relativePath: string;
   sha256: string;
@@ -200,6 +235,9 @@ export type AppErrorCode =
   | "E_EXPORT_ACTIVE"
   | "E_EXPORT_NOT_FOUND"
   | "E_EXPORT_CANCELLED"
+  | "E_ANALYSIS_ACTIVE"
+  | "E_ANALYSIS_NOT_FOUND"
+  | "E_ANALYSIS_FAILED"
   | "E_INTEGRATION_UNAVAILABLE"
   | "E_AUTH_REQUIRED"
   | "E_NETWORK"

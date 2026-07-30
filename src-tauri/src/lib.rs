@@ -17,6 +17,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(security::path_policy::PathPolicy::default())
         .manage(services::export::ExportRegistry::default())
+        .manage(services::clip_analysis::ClipAnalysisRegistry::default())
         .setup(|app| {
             use tauri::Manager;
 
@@ -58,6 +59,8 @@ pub fn run() {
             commands::assets::import_overlay_asset,
             commands::assets::import_sting_asset,
             commands::assets::write_caption_asset,
+            commands::clip_analysis::start_clip_analysis,
+            commands::clip_analysis::cancel_clip_analysis,
             commands::diagnostics::select_diagnostic_destination,
             commands::diagnostics::create_diagnostic_bundle,
             commands::diagnostics::reveal_in_folder,
@@ -95,9 +98,14 @@ pub fn run() {
                 .state::<services::export::ExportRegistry>()
                 .inner()
                 .clone();
-            if registry.is_active() {
+            let analysis_registry = app
+                .state::<services::clip_analysis::ClipAnalysisRegistry>()
+                .inner()
+                .clone();
+            if registry.is_active() || analysis_registry.is_active() {
                 api.prevent_exit();
                 registry.cancel_active();
+                analysis_registry.cancel_active();
                 app.state::<services::diagnostics::Diagnostics>().record(
                     "info",
                     "shutdown_export_cancellation_requested",
@@ -107,7 +115,7 @@ pub fn run() {
                 let _ = thread::Builder::new()
                     .name("skcf-shutdown-wait".to_owned())
                     .spawn(move || {
-                        while registry.is_active() {
+                        while registry.is_active() || analysis_registry.is_active() {
                             thread::sleep(Duration::from_millis(50));
                         }
                         app.exit(0);

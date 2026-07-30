@@ -142,6 +142,24 @@ The user always confirms the exact project/video link. The UI does not imply
 that matching titles or filenames proves provenance. Scorecards identify the
 last requested complete date and state that YouTube data may be delayed.
 
+### Find clip moments
+
+The Editor exposes a separate **Find moments** workspace for the current source.
+The first analysis profile is intentionally Diablo IV-specific and scans locally
+for:
+
+- completion/title treatments with a bright emblem and gold title signature;
+- player-death treatments with a wide pale title, red treatment and darkened
+  gameplay field;
+- boss encounters with a persistent health bar substantially wider than normal
+  enemy health bars near the top HUD.
+
+The panel shows progress and supports cancellation. Results include event time,
+suggested clip range, confidence and safe evidence labels. The user can review
+the source frame before choosing **Use suggested range**. Detection never
+silently changes the timeline, and empty/error/cancelled states preserve the
+current edit.
+
 ## Preview/crop interaction
 
 The preview stage uses the display-oriented source aspect ratio and fits within
