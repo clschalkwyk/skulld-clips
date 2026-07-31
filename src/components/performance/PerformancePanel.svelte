@@ -54,13 +54,21 @@
         null,
   );
   const performance = $derived(activeLink?.performance ?? null);
+  const integrationUnavailable = $derived(
+    !loading && status?.configured === false,
+  );
 
   onMount(() => {
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     closeButton.focus();
     void loadWorkspace();
     return () => {
       disposed = true;
       stopConnectionPolling();
+      previouslyFocusedElement?.focus();
     };
   });
 
@@ -68,12 +76,13 @@
     loading = true;
     error = null;
     try {
-      const [connection, saved] = await Promise.all([
-        getYouTubeConnectionStatus(),
-        listYouTubePerformance(),
-      ]);
+      const connection = await getYouTubeConnectionStatus();
       status = connection;
-      links = saved;
+      if (!connection.configured) {
+        links = [];
+        return;
+      }
+      links = await listYouTubePerformance();
       if (connection.authenticated) {
         await loadUploads();
       } else if (isYouTubeConnectionPending(connection.connectionPhase)) {
@@ -258,6 +267,7 @@
 <div class="performance-backdrop" role="presentation">
   <div
     class="performance-dialog"
+    class:unavailable={integrationUnavailable}
     role="dialog"
     aria-modal="true"
     aria-labelledby="performance-heading"
@@ -283,16 +293,50 @@
         <span class="spinner" aria-hidden="true"></span>
         Loading local performance data…
       </div>
-    {:else if !status?.configured}
+    {:else if !status}
       <div class="performance-empty" role="status">
-        <span class="performance-kicker">Integration unavailable</span>
-        <h3>This build is not configured for YouTube.</h3>
+        <span class="performance-kicker">Workspace unavailable</span>
+        <h3>Channel performance couldn’t open.</h3>
         <p>
-          Add a Google OAuth desktop client ID as
-          <code>SKCF_YOUTUBE_CLIENT_ID</code>, enable the YouTube Data and
-          YouTube Analytics APIs, then restart Clip Forge.
+          Close this panel and try again. Your editor and local projects are
+          unaffected.
         </p>
       </div>
+    {:else if !status.configured}
+      <section
+        class="performance-unavailable"
+        aria-labelledby="performance-unavailable-heading"
+      >
+        <div class="performance-unavailable-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M10 8.75 15 12l-5 3.25z"></path>
+          </svg>
+        </div>
+        <div class="performance-unavailable-message" role="status" aria-live="polite">
+          <span class="performance-kicker">Optional integration</span>
+          <h3 id="performance-unavailable-heading">
+            Channel performance isn’t available in this build.
+          </h3>
+          <p class="performance-unavailable-copy">
+            You can keep editing and exporting normally. YouTube analytics is a
+            separate read-only feature and does not affect your local projects.
+          </p>
+        </div>
+        <details class="performance-setup">
+          <summary>Developer setup</summary>
+          <div>
+            <p>
+              Configure a Google OAuth desktop client before starting Clip
+              Forge, enable the YouTube Data and YouTube Analytics APIs, then
+              restart the app.
+            </p>
+            <code>SKCF_YOUTUBE_CLIENT_ID</code>
+          </div>
+        </details>
+        <button class="primary-button" type="button" onclick={onClose}>
+          Back to Clip Forge
+        </button>
+      </section>
     {:else if !status.authenticated}
       <div class="performance-empty">
         <span class="performance-kicker">No channel connected</span>
@@ -575,7 +619,7 @@
       {/if}
     {/if}
 
-    {#if error}
+    {#if error && !(integrationUnavailable && error.code === "E_INTEGRATION_UNAVAILABLE")}
       <div class="performance-error" role="alert" aria-live="assertive">
         <div>
           <strong>{error.message}</strong>
@@ -585,9 +629,11 @@
       </div>
     {/if}
 
-    <footer class="performance-footer">
-      <span>Read-only · no media upload</span>
-      <span>YouTube data may be delayed</span>
-    </footer>
+    {#if !integrationUnavailable}
+      <footer class="performance-footer">
+        <span>Read-only · no media upload</span>
+        <span>YouTube data may be delayed</span>
+      </footer>
+    {/if}
   </div>
 </div>

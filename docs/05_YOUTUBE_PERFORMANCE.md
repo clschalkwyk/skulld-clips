@@ -153,5 +153,8 @@ Before public distribution:
 - run a real configured-channel smoke without recording channel IDs, video
   titles, metrics, tokens, or private paths in CI output.
 
-An unconfigured build must show an unavailable state and keep the editor fully
-functional.
+An unconfigured build must show a compact unavailable state and keep the editor
+fully functional. End-user copy must confirm that local editing and export are
+unaffected. OAuth environment variables and API enablement instructions belong
+behind a developer-setup disclosure, and the panel must not repeat the same
+configuration problem as both an unavailable state and an error alert.
