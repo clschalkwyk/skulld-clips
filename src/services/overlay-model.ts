@@ -133,6 +133,19 @@ export function insertStingOverlayAtPlayhead(
   outMs: number,
   zIndex: number,
 ): StingOverlay {
+  return {
+    ...moveStingOverlayToPlayhead(source, playheadMs, inMs, outMs),
+    id,
+    zIndex,
+  };
+}
+
+export function moveStingOverlayToPlayhead(
+  source: StingOverlay,
+  playheadMs: number,
+  inMs: number,
+  outMs: number,
+): StingOverlay {
   if (outMs - inMs < 500) {
     throw new Error("The active range must leave at least 500 ms for the Skull'd sting.");
   }
@@ -140,12 +153,27 @@ export function insertStingOverlayAtPlayhead(
   const durationMs = Math.min(source.endMs - source.startMs, outMs - startMs);
   return {
     ...source,
-    id,
     position: { ...source.position },
     startMs,
     endMs: startMs + durationMs,
-    zIndex,
   };
+}
+
+export function findStingStartingAtPlayhead(
+  overlays: StingOverlay[],
+  playheadMs: number,
+  inMs: number,
+  outMs: number,
+): StingOverlay | null {
+  if (outMs - inMs < 500) {
+    return null;
+  }
+  const insertionStartMs = Math.round(clamp(playheadMs, inMs, outMs - 500));
+  return (
+    overlays.find(
+      (overlay) => Math.abs(overlay.startMs - insertionStartMs) <= 1,
+    ) ?? null
+  );
 }
 
 export function stingPlaybackRate(overlay: StingOverlay): 1 | 2 | 3 {

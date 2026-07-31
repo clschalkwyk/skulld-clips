@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Overlay } from "../../../contracts/types";
   import { MAX_STING_OVERLAYS } from "../../services/overlay-model";
+  import { formatTimelineTime } from "../../services/timeline";
 
   interface Props {
     overlays: Overlay[];
@@ -48,6 +49,25 @@
       composingCaption = false;
     }
   }
+
+  function stingOrdinal(id: string): number {
+    return [...overlays]
+      .filter((overlay) => overlay.type === "sting")
+      .sort((a, b) => a.startMs - b.startMs)
+      .findIndex((overlay) => overlay.id === id) + 1;
+  }
+
+  function overlayLabel(overlay: Overlay): string {
+    return overlay.type === "sting"
+      ? `Sting ${stingOrdinal(overlay.id)}`
+      : overlay.type;
+  }
+
+  function overlayTitle(overlay: Overlay): string {
+    return overlay.type === "sting"
+      ? `${overlayLabel(overlay)} · ${formatTimelineTime(overlay.startMs)} · ${overlay.name}`
+      : overlay.name;
+  }
 </script>
 
 <div class="rail-heading">
@@ -84,12 +104,16 @@
     type="button"
     class="rail-item"
     disabled={busy || stingLimitReached}
-    aria-label={stingLimitReached ? "Eight-sting limit reached" : "Add Skull’d sting"}
-    title={stingLimitReached ? "Eight-sting limit reached" : "Add Skull’d sting"}
+    aria-label={stingLimitReached
+      ? "Eight-sting limit reached"
+      : `Add Skull’d sting. ${stingCount} of ${MAX_STING_OVERLAYS} used`}
+    title={stingLimitReached
+      ? "Eight-sting limit reached"
+      : `Add Skull’d sting · ${stingCount}/${MAX_STING_OVERLAYS}`}
     onclick={onAddSting}
   >
     <span class="rail-glyph">STG</span>
-    <strong>Sting</strong>
+    <strong>Add Sting</strong>
   </button>
   <button
     type="button"
@@ -154,13 +178,13 @@
         class:selected={selectedOverlayId === overlay.id}
         aria-label={`Edit ${overlay.type} overlay ${overlay.name}`}
         aria-pressed={selectedOverlayId === overlay.id}
-        title={overlay.name}
+        title={overlayTitle(overlay)}
         onclick={() => onSelect(overlay.id)}
       >
         <span class="rail-glyph">
           {overlay.type === "sting" ? "STG" : overlay.type === "image" ? "IMG" : "TXT"}
         </span>
-        <strong>{overlay.type}</strong>
+        <strong>{overlayLabel(overlay)}</strong>
       </button>
     {/each}
   </div>

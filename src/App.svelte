@@ -44,9 +44,12 @@
     createImageOverlay,
     createStingOverlay,
     DEFAULT_CAPTION_STYLE,
+    findStingStartingAtPlayhead,
     insertStingOverlayAtPlayhead,
+    isOverlayVisible,
     MAX_STING_OVERLAYS,
     maximumStingDurationMs,
+    moveStingOverlayToPlayhead,
     nextZIndex,
     reorderOverlay,
     replaceOverlayAsset,
@@ -840,6 +843,20 @@
       await addStingOverlay(playheadMs);
       return;
     }
+    const existing =
+      stings.find((sting) => isOverlayVisible(sting, playheadMs)) ??
+      findStingStartingAtPlayhead(
+        stings,
+        playheadMs,
+        session.project.timeline.inMs,
+        session.project.timeline.outMs,
+      );
+    if (existing) {
+      selectedOverlayId = existing.id;
+      captionStatus = "idle";
+      actionError = null;
+      return;
+    }
     const inserted = insertStingOverlayAtPlayhead(
       template,
       crypto.randomUUID(),
@@ -853,6 +870,38 @@
     captionStatus = "idle";
     actionError = null;
     markProjectDirty();
+  }
+
+  function moveSelectedStingToPlayhead(): void {
+    if (
+      !session ||
+      session.sourceStatus !== "ok" ||
+      selectedOverlay?.type !== "sting"
+    ) {
+      return;
+    }
+    const occupiedBy = session.project.overlays.find(
+      (overlay) =>
+        overlay.type === "sting" &&
+        overlay.id !== selectedOverlay.id &&
+        isOverlayVisible(overlay, playheadMs),
+    );
+    if (occupiedBy) {
+      selectedOverlayId = occupiedBy.id;
+      captionStatus = "idle";
+      actionError = null;
+      return;
+    }
+    playing = false;
+    updateOverlay(
+      moveStingOverlayToPlayhead(
+        selectedOverlay,
+        playheadMs,
+        session.project.timeline.inMs,
+        session.project.timeline.outMs,
+      ),
+    );
+    actionError = null;
   }
 
   async function replaceImageOverlay(id: string): Promise<void> {
@@ -1627,6 +1676,7 @@
         {playheadMs}
         {playing}
         overlays={session.project.overlays}
+        {selectedOverlayId}
         disabled={session.sourceStatus !== "ok"}
         insertStingDisabled={overlayBusy ||
           session.project.overlays.filter((overlay) => overlay.type === "sting").length >=
@@ -1634,6 +1684,8 @@
         onInChange={updateTrimIn}
         onOutChange={updateTrimOut}
         onInsertSting={insertStingAtPlayhead}
+        onMoveSelectedSting={moveSelectedStingToPlayhead}
+        onOverlaySelect={selectOverlay}
         onPlayheadChange={updatePlayhead}
         onPlayingChange={updatePlaying}
       />

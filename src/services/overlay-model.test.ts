@@ -5,9 +5,11 @@ import {
   anchorOverlay,
   createImageOverlay,
   createStingOverlay,
+  findStingStartingAtPlayhead,
   insertStingOverlayAtPlayhead,
   isOverlayVisible,
   moveOverlay,
+  moveStingOverlayToPlayhead,
   nudgeOverlay,
   reorderOverlay,
   resizeOverlay,
@@ -253,5 +255,42 @@ describe("overlay model", () => {
 
     expect(inserted.startMs).toBe(9_500);
     expect(inserted.endMs).toBe(10_000);
+  });
+
+  it("moves an existing sting to the playhead without creating a new instance", () => {
+    const source = createStingOverlay(
+      "00000000-0000-4000-8000-000000000001",
+      stingAsset,
+      1_000,
+      10_000,
+      2,
+    );
+
+    const moved = moveStingOverlayToPlayhead(source, 6_000, 1_000, 10_000);
+
+    expect(moved.id).toBe(source.id);
+    expect(moved.zIndex).toBe(source.zIndex);
+    expect(moved.startMs).toBe(6_000);
+    expect(moved.endMs).toBe(10_000);
+    expect(moved.position).toEqual(source.position);
+    expect(moved.position).not.toBe(source.position);
+  });
+
+  it("finds an existing sting at the clamped insertion point", () => {
+    const source = createStingOverlay(
+      "00000000-0000-4000-8000-000000000001",
+      stingAsset,
+      1_000,
+      10_000,
+      2,
+    );
+    const nearEnd = moveStingOverlayToPlayhead(source, 9_900, 1_000, 10_000);
+
+    expect(
+      findStingStartingAtPlayhead([source, nearEnd], 9_900, 1_000, 10_000),
+    ).toBe(nearEnd);
+    expect(
+      findStingStartingAtPlayhead([source, nearEnd], 6_000, 1_000, 10_000),
+    ).toBeNull();
   });
 });
