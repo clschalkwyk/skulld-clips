@@ -56,6 +56,16 @@
     state.validation?.errors.filter(({ code }) => code !== "E_OUTPUT_EXISTS") ??
       [],
   );
+  const mediaToolErrors = $derived(
+    nonOverwriteErrors.filter(
+      ({ code }) => code === "E_FFMPEG_FAILED" || code === "E_FFPROBE_FAILED",
+    ),
+  );
+  const otherValidationErrors = $derived(
+    nonOverwriteErrors.filter(
+      ({ code }) => code !== "E_FFMPEG_FAILED" && code !== "E_FFPROBE_FAILED",
+    ),
+  );
   const canStart = $derived(
     destinationPath.length > 0 &&
       !active &&
@@ -115,7 +125,7 @@
   >
     <header class="export-heading">
       <div>
-        <p class="section-label">Verified local export</p>
+        <p class="section-label">Local MP4 export</p>
         <h2 id="export-title">Export vertical MP4</h2>
         <p>{projectName}</p>
       </div>
@@ -255,9 +265,30 @@
           </label>
         {/if}
 
-        {#if nonOverwriteErrors.length > 0}
+        {#if mediaToolErrors.length > 0}
           <div class="export-errors" role="alert">
-            {#each nonOverwriteErrors as error (error.code)}
+            <div>
+              <strong>Local media tools are unavailable.</strong>
+              <p>
+                Clip Forge needs both FFmpeg and ffprobe to encode and verify the
+                final MP4. Install or configure the missing tools, then retry.
+              </p>
+            </div>
+            <div>
+              <button
+                class="secondary-button compact-button"
+                type="button"
+                onclick={onStart}
+              >
+                Retry export
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        {#if otherValidationErrors.length > 0}
+          <div class="export-errors" role="alert">
+            {#each otherValidationErrors as error (error.code)}
               <div>
                 <strong>{error.message}</strong>
                 {#if error.safeDetail}<p>{error.safeDetail}</p>{/if}

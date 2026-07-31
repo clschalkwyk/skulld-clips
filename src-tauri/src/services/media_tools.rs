@@ -86,6 +86,13 @@ fn resolve_media_tool(
                 bundled: false,
             });
         }
+
+        if let Some(path) = find_in_development_locations(tool.command_name()) {
+            return Ok(ResolvedTool {
+                path,
+                bundled: false,
+            });
+        }
     }
 
     if let Some(resource_dir) = resource_dir {
@@ -97,14 +104,20 @@ fn resolve_media_tool(
         }
     }
 
-    Err(AppError::media_tool_failed(
-        tool.command_name(),
+    let detail = if cfg!(debug_assertions) {
         format!(
-            "Install {} for development or set {} to an absolute executable path.",
+            "Install {} for development or set {} to an absolute executable path, then restart Clip Forge.",
             tool.command_name(),
             tool.override_name()
-        ),
-    ))
+        )
+    } else {
+        format!(
+            "This build is missing its bundled {} binary. Reinstall Clip Forge from a verified package.",
+            tool.command_name()
+        )
+    };
+
+    Err(AppError::media_tool_failed(tool.command_name(), detail))
 }
 
 fn validate_tool_path(
@@ -138,8 +151,37 @@ fn validate_tool_path(
 fn find_on_path(program: &str, path_value: Option<&OsString>) -> Option<PathBuf> {
     let path_value = path_value?;
 
-    env::split_paths(path_value)
-        .flat_map(|directory| executable_candidates(&directory, program))
+    find_in_directories(program, env::split_paths(path_value))
+}
+
+fn find_in_development_locations(program: &str) -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        find_in_directories(
+            program,
+            [
+                Path::new("/opt/homebrew/bin"),
+                Path::new("/usr/local/bin"),
+                Path::new("/opt/local/bin"),
+            ],
+        )
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = program;
+        None
+    }
+}
+
+fn find_in_directories<I, P>(program: &str, directories: I) -> Option<PathBuf>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    directories
+        .into_iter()
+        .flat_map(|directory| executable_candidates(directory.as_ref(), program))
         .find(|candidate| candidate.is_file())
         .and_then(|candidate| fs::canonicalize(candidate).ok())
 }
@@ -250,7 +292,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use super::{find_on_path, parse_version, MediaTool};
+    use super::{find_in_directories, find_on_path, parse_version, MediaTool};
 
     #[test]
     fn parses_ffmpeg_and_ffprobe_versions() {
@@ -296,6 +338,29 @@ mod tests {
         let path_value = OsString::from(directory.as_os_str());
 
         let resolved = find_on_path("ffprobe", Some(&path_value));
+
+        assert_eq!(resolved, Some(fs::canonicalize(&executable).unwrap()));
+        fs::remove_file(executable).unwrap();
+        fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn resolves_a_tool_from_a_known_development_directory() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!("skcf-known-path-test-{unique}"));
+        fs::create_dir_all(&directory).unwrap();
+
+        #[cfg(target_os = "windows")]
+        let executable = directory.join("ffmpeg.exe");
+        #[cfg(not(target_os = "windows"))]
+        let executable = directory.join("ffmpeg");
+
+        fs::write(&executable, b"fixture").unwrap();
+
+        let resolved = find_in_directories("ffmpeg", [&directory]);
 
         assert_eq!(resolved, Some(fs::canonicalize(&executable).unwrap()));
         fs::remove_file(executable).unwrap();
